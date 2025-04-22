@@ -1,0 +1,24 @@
+//program exemplo;
+//const pi = 3.14;
+//var nome : string;
+//begin
+//    nome := "teste de string";
+//end.
+
+program exemploErro;
+const pi = 3.14;
+var nome : string;
+var idade := 25;
+var email : string;
+begin
+    nome := "João da Silva";
+    idade := 25;
+    email := joao@email.com;        // Erro: string sem aspas
+    altura := 1..80;                // Erro: número real com dois pontos
+    peso := 70kg;                   // Erro: número seguido por letras
+    cidade := "São Paulo;           // Erro: string não fechada
+    estado := "SP";
+    cep := 123abc;                  // Erro: número seguido de letras
+    @invalid := "erro";            // Erro: identificador com @
+    operador :=:= "invalido";      // Erro: operador mal formado
+end.
