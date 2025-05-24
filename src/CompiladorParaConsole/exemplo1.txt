@@ -1,0 +1,27 @@
+program exemplo1;
+// Exemplo 1: Declarações básicas, I/O e comentários
+
+const MAX_VALOR = 100;
+var nome : string;
+var idade : integer;
+var salario : real;
+
+// Bloco principal
+begin
+    print { "Digite seu nome: " };
+    read(nome);
+
+    print { "Digite sua idade: " };
+    read(idade);
+
+    salario := 1500.50;
+
+    print { "Nome: ", nome };
+    print { "Idade: ", idade };
+    print { "Salario: ", salario };
+    print { "Constante MAX_VALOR: ", MAX_VALOR };
+
+    // Comentário de bloco simulado (linha a linha)
+    // Linha 1 do comentário
+    // Linha 2 do comentário
+end.

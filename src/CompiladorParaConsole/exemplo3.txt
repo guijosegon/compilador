@@ -1,0 +1,36 @@
+program exemplo3;
+// Exemplo 3: Loop for e expressões
+
+var i : integer;
+var soma : integer;
+var limite : integer;
+
+procedure calcularSoma(max : integer);
+begin
+    soma := 0;
+    print { "Calculando soma de 1 a ", max };
+    for i := 1 to max do
+    begin
+        soma := soma + i;
+    end;
+    print { "Soma calculada: ", soma };
+end;
+
+// Bloco Principal
+begin
+    limite := 10;
+    calcularSoma(limite); // Chamada de procedure
+
+    // Exemplo de expressão relacional em if
+    if (soma > 50) then
+    begin
+        print { "A soma é maior que 50." };
+    end
+    else
+    begin
+        print { "A soma não é maior que 50." };
+    end;
+
+    // Exemplo de print com expressão
+    print { "O dobro do limite é: ", limite * 2 };
+end.

@@ -1,0 +1,46 @@
+program exemplo2;
+// Exemplo 2: Procedures, if/else e while
+
+var contador : integer;
+var flag : integer; // Usado como booleano (0 ou 1)
+
+procedure verificarPar(numero : integer);
+var resto : integer;
+begin
+    // Simula módulo com divisão e multiplicação
+    resto := numero - (numero / 2) * 2;
+    if resto = 0 then
+    begin
+        print { numero, " é par." };
+    end
+    else
+    begin
+        print { numero, " é ímpar." };
+    end;
+end;
+
+procedure contagemRegressiva(inicio : integer);
+begin
+    contador := inicio;
+    while contador > 0 do
+    begin
+        print { "Contando: ", contador };
+        verificarPar(contador); // Chamada de procedure
+        contador := contador - 1;
+    end;
+    print { "Fim da contagem!" };
+end;
+
+// Bloco Principal
+begin
+    flag := 1;
+    if flag = 1 then
+    begin
+        print { "Iniciando contagem regressiva de 5:" };
+        contagemRegressiva(5); // Chamada de procedure
+    end
+    else
+    begin
+        print { "Contagem não iniciada." };
+    end;
+end.
