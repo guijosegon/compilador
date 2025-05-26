@@ -13,133 +13,104 @@ namespace CompiladorParaConsole
 
             Dictionary<string, int> tabela = new Dictionary<string, int>
             {
-                {"while", 1},
-                {"var", 2},
-                {"to", 3},
-                {"then", 4},
-                {"string", 5},
-                {"real", 6},
-                {"read", 7},
-                {"program", 8},
-                {"procedure", 9},
-                {"print", 10},
-                {"nreal", 11},
-                {"nint", 12},
-                {"literal", 13},
-                {"integer", 14},
-                {"if", 15},
-                {"ident", 16},
-                {"for", 17},
-                {"end", 18},
-                {"else", 19},
-                {"do", 20},
-                {"const", 21},
-                {"begin", 22},
-                {"vstring", 23},
-                {">=", 24},
-                {">", 25},
-                {"=", 26},
-                {"<>", 27},
-                {"<=", 28},
-                {"<", 29},
-                {"+", 30},
-                {";", 31},
-                {":=", 32},
-                {":", 33},
-                {"/", 34},
-                {".", 35},
-                {",", 36},
-                {"*", 37},
-                {")", 38},
-                {"(", 39},
-                {"{", 40},
-                {"}", 41},
-                {"-", 42},
-                {"$", 43},
-                {"î", 44}
+                {"while", 1}, {"var", 2}, {"to", 3}, {"then", 4},{"string", 5}, {"real", 6}, {"read", 7}, {"program", 8},
+                {"procedure", 9}, {"print", 10}, {"nreal", 11}, {"nint", 12},{"literal", 13}, {"integer", 14}, {"if", 15}, 
+                {"ident", 16},{"for", 17}, {"end", 18}, {"else", 19}, {"do", 20}, {"const", 21}, {"begin", 22}, {"vstring", 23}, 
+                {">=", 24}, {">", 25}, {"=", 26}, {"<>", 27}, {"<=", 28}, {"<", 29}, {"+", 30}, {";", 31}, {":=", 32}, {":", 33},
+                { "/", 34}, {".", 35}, {",", 36}, {"*", 37}, {")", 38}, {"(", 39}, {"{", 40}, {"}", 41}, {"-", 42}, {"$", 43}, {"î", 44}
             };
 
-            // Regra léxica para comentário -> Deve começar com // e sua linha removida.
             List<string> linhasProcessadas = new List<string>();
             string[] linhasOriginais = codigo.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
             foreach (string linhaOriginal in linhasOriginais)
             {
-                // Remove comments starting with //
                 linhasProcessadas.Add(Regex.Replace(linhaOriginal, @"//.*", ""));
             }
             codigo = string.Join("\n", linhasProcessadas);
-
-
-            // Regra léxica para literal -> Deve estar entre aspas duplas
-            // Updated Regex to better handle simple strings, but still basic.
-            Regex regexString = new Regex("^\".*\"$");
-
-            // Regra léxica para nreal -> Devem conter parte inteira, ponto e parte decimal.
-            Regex regexFloat = new Regex(@"^\d+\.\d+$");
-
-            // Regra léxica para nint -> Devem conter apenas dígitos.
-            Regex regexInt = new Regex(@"^\d+$");
-
-            // Regra léxica para ident -> Devem começar com letra (a-z ou A-Z) ou underscore _, podem conter numeros.
-            Regex regexIdent = new Regex(@"^[a-zA-Z_][a-zA-Z0-9_]*$");
 
             string[] linhas = codigo.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
 
             for (int i = 0; i < linhas.Length; i++)
             {
-                // Split considering operators as delimiters and keeping them
-                string[] palavras = Regex.Split(linhas[i], @"(\s+|>=|<=|:=|<>|[();:.,+\-*/=<>{}])");
+                string linha = linhas[i];
+                int coluna = 0;
 
-                foreach (string palavra in palavras)
+                while (coluna < linha.Length)
                 {
-                    string lexema = palavra.Trim();
-                    if (string.IsNullOrEmpty(lexema)) continue;
+                    char atual = linha[coluna];
 
-                    if (tabela.ContainsKey(lexema))
-                        resultado.Add(new TokenInfo(tabela[lexema], lexema, i + 1));
-                    else if (regexString.IsMatch(lexema))
-                        resultado.Add(new TokenInfo(13, lexema, i + 1));
-                    else if (regexFloat.IsMatch(lexema))
+                    if (char.IsWhiteSpace(atual))
+                    {
+                        coluna++;
+                        continue;
+                    }
+
+                    var matchFloat = Regex.Match(linha.Substring(coluna), @"^\d+\.\d+");
+                    if (matchFloat.Success)
+                    {
+                        string lexema = matchFloat.Value;
                         resultado.Add(new TokenInfo(11, lexema, i + 1));
-                    else if (regexInt.IsMatch(lexema))
+                        coluna += lexema.Length;
+                        continue;
+                    }
+
+                    var matchInt = Regex.Match(linha.Substring(coluna), @"^\d+");
+                    if (matchInt.Success)
+                    {
+                        string lexema = matchInt.Value;
                         resultado.Add(new TokenInfo(12, lexema, i + 1));
-                    else if (regexIdent.IsMatch(lexema))
-                        resultado.Add(new TokenInfo(16, lexema, i + 1));
-                    else
-                        Erros.Add($"[ERRO] {DetectarErroLexico(lexema)} na linha {i + 1}");
+                        coluna += lexema.Length;
+                        continue;
+                    }
+
+                    var matchString = Regex.Match(linha.Substring(coluna), "^\"[^\"]*\"");
+                    if (matchString.Success)
+                    {
+                        string lexema = matchString.Value;
+                        resultado.Add(new TokenInfo(13, lexema, i + 1));
+                        coluna += lexema.Length;
+                        continue;
+                    }
+
+                    string[] compostos = { ">=", "<=", ":=", "<>" };
+                    bool encontrouComposto = false;
+                    foreach (var op in compostos)
+                    {
+                        if (linha.Substring(coluna).StartsWith(op))
+                        {
+                            resultado.Add(new TokenInfo(tabela[op], op, i + 1));
+                            coluna += op.Length;
+                            encontrouComposto = true;
+                            break;
+                        }
+                    }
+                    if (encontrouComposto) continue;
+
+                    string simbolo = linha[coluna].ToString();
+                    if (tabela.ContainsKey(simbolo))
+                    {
+                        resultado.Add(new TokenInfo(tabela[simbolo], simbolo, i + 1));
+                        coluna++;
+                        continue;
+                    }
+
+                    var matchIdent = Regex.Match(linha.Substring(coluna), @"^[a-zA-Z_][a-zA-Z0-9_]*");
+                    if (matchIdent.Success)
+                    {
+                        string lexema = matchIdent.Value;
+                        int cod = tabela.ContainsKey(lexema) ? tabela[lexema] : 16;
+                        resultado.Add(new TokenInfo(cod, lexema, i + 1));
+                        coluna += lexema.Length;
+                        continue;
+                    }
+
+                    string resto = linha.Substring(coluna).Split(' ').FirstOrDefault() ?? linha[coluna].ToString();
+                    Erros.Add($"[ERRO] Lexema inválido: '{resto}' na linha {i + 1}");
+                    coluna += resto.Length;
                 }
             }
 
             return resultado;
-        }
-
-        private static string DetectarErroLexico(string lexema)
-        {
-            if (Regex.IsMatch(lexema, @"^\d+[a-zA-Z_].*$"))
-                return $"Número malformado: 	'{lexema}' (número seguido por caracteres inválidos)";
-
-            if (lexema.StartsWith("\"") && (!lexema.EndsWith("\"") || lexema.Length == 1))
-                return $"String não finalizada: 	'{lexema}' (aspas de fechamento ausente ou string vazia inválida)";
-
-            if (Regex.IsMatch(lexema, @"\d+\.\.\d+") || Regex.IsMatch(lexema, @"^\.\d+") || Regex.IsMatch(lexema, @"\d+\.$$"))
-                return $"Número real inválido: 	'{lexema}' (formato incorreto, ex: '..', '.5', '5.')";
-
-            if (Regex.IsMatch(lexema, @"^[0-9]"))
-            {
-                if (!Regex.IsMatch(lexema, @"^\d+$") && !Regex.IsMatch(lexema, @"^\d+\.\d+$"))
-                    return $"Número malformado: 	'{lexema}'";
-            }
-
-            if (!Regex.IsMatch(lexema, @"^[a-zA-Z0-9_+*/=<>():;.,{}""\s.-]+$"))
-                return $"Caractere inválido: 	'{lexema}' (contém símbolos não permitidos pela linguagem)";
-
-            if (lexema.Contains("@"))
-                return $"Identificador inválido: 	'{lexema}' (caractere '@' não permitido)";
-
-            if (lexema == ":=:")
-                return $"Operador malformado: 	'{lexema}'";
-
-            return $"Lexema inválido: 	'{lexema}'";
         }
     }
 

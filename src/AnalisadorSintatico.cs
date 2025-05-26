@@ -64,7 +64,6 @@ namespace CompiladorParaConsole
         private const string NT_MORE_CONST = "MORE_CONST";
         private const string NT_VAR_SEC = "VAR_SEC";
         private const string NT_DEF_VAR_LIST = "DEF_VAR_LIST";
-        private const string NT_MORE_VAR = "MORE_VAR";
         private const string NT_LISTAVARIAVEIS = "LISTAVARIAVEIS";
         private const string NT_LIDENT = "LIDENT";
         private const string NT_TIPO = "TIPO";
@@ -117,7 +116,7 @@ namespace CompiladorParaConsole
             naoTerminais = new HashSet<string>
             {
                 NT_PROGRAMA, NT_DECLARACOES, NT_CONST_SEC, NT_DEF_CONST_LIST, NT_MORE_CONST, NT_VAR_SEC,
-                NT_DEF_VAR_LIST, NT_MORE_VAR, NT_LISTAVARIAVEIS, NT_LIDENT, NT_TIPO, NT_PROC_SEC, NT_PROC_LIST,
+                NT_DEF_VAR_LIST, NT_LISTAVARIAVEIS, NT_LIDENT, NT_TIPO, NT_PROC_SEC, NT_PROC_LIST,
                 NT_PROC_LIST_TAIL, NT_PARAMETROS, NT_LISTAPARAM, NT_PARAM_REST, NT_BLOCO, NT_COMANDOS,
                 NT_CMD_REST, NT_COMANDO, NT_CMD_IDENT_REST, NT_CHAMADAPROC, NT_PARAMETROSCHAMADA,
                 NT_PARAM_CHAMADA_REST, NT_ELSEOPC, NT_ITEMSAIDA, NT_REPITEM, NT_EXPRELACIONAL, NT_OPREL,
@@ -170,22 +169,15 @@ namespace CompiladorParaConsole
             AddEntry(NT_MORE_CONST, T_PROCEDURE, T_EPSILON);
             AddEntry(NT_MORE_CONST, T_BEGIN, T_EPSILON);
 
-            // Regra 6: VAR_SEC -> var DEF_VAR_LIST | î
+            // Regra 6: VAR_SEC -> var DEF_VAR_LIST  NT_VAR_SEC| î
             // FIRST(var...) = {var}
             // FOLLOW(VAR_SEC) = {procedure, begin}
-            AddEntry(NT_VAR_SEC, T_VAR, T_VAR, NT_DEF_VAR_LIST);
+            AddEntry(NT_VAR_SEC, T_VAR, T_VAR, NT_DEF_VAR_LIST, NT_VAR_SEC);
             AddEntry(NT_VAR_SEC, T_PROCEDURE, T_EPSILON);
             AddEntry(NT_VAR_SEC, T_BEGIN, T_EPSILON);
 
-            // Regra 7: DEF_VAR_LIST -> LISTAVARIAVEIS : TIPO ; MORE_VAR
-            AddEntry(NT_DEF_VAR_LIST, T_IDENT, NT_LISTAVARIAVEIS, T_COLON, NT_TIPO, T_SEMICOLON, NT_MORE_VAR);
-
-            // Regra 8: MORE_VAR -> LISTAVARIAVEIS : TIPO ; MORE_VAR | î
-            // FIRST(LISTAVARIAVEIS...) = {ident}
-            // FOLLOW(MORE_VAR) = FOLLOW(VAR_SEC) = {procedure, begin}
-            AddEntry(NT_MORE_VAR, T_IDENT, NT_LISTAVARIAVEIS, T_COLON, NT_TIPO, T_SEMICOLON, NT_MORE_VAR);
-            AddEntry(NT_MORE_VAR, T_PROCEDURE, T_EPSILON);
-            AddEntry(NT_MORE_VAR, T_BEGIN, T_EPSILON);
+            // Regra 7: DEF_VAR_LIST -> LISTAVARIAVEIS : TIPO ;
+            AddEntry(NT_DEF_VAR_LIST, T_IDENT, NT_LISTAVARIAVEIS, T_COLON, NT_TIPO, T_SEMICOLON);
 
             // Regra 9: LISTAVARIAVEIS -> ident LIDENT
             AddEntry(NT_LISTAVARIAVEIS, T_IDENT, T_IDENT, NT_LIDENT);
@@ -262,6 +254,9 @@ namespace CompiladorParaConsole
 
             // Regra 23: COMANDO -> ident CMD_IDENT_REST
             AddEntry(NT_COMANDO, T_IDENT, T_IDENT, NT_CMD_IDENT_REST);
+
+            // Regra 23b: COMANDO -> ε  (quando vier 'end')
+            AddEntry(NT_COMANDO, T_END, T_EPSILON);
 
             // Regra 24: CMD_IDENT_REST -> := EXPRESSAO | CHAMADAPROC
             // FIRST(:= EXPRESSAO) = { := }
@@ -433,7 +428,7 @@ namespace CompiladorParaConsole
             do
             {
                 string topo = pilha.Peek();
-                TokenInfo tokenAtual = tokens[tokenIndex];
+                TokenInfo tokenAtual = tokenIndex < tokens.Count ? tokens[tokenIndex] : new TokenInfo(0, "$", tokens.LastOrDefault()?.Linha ?? 1);
                 string terminalAtual = MapearTokenParaTerminal(tokenAtual);
 
                 Console.WriteLine($"Pilha: [ {string.Join(", ", pilha.Reverse())} ] | Token Atual: {terminalAtual} (	'{tokenAtual.Lexema}		' Linha: {tokenAtual.Linha})");
@@ -495,8 +490,7 @@ namespace CompiladorParaConsole
 
             } while (pilha.Peek() != T_EOF);
 
-            // Verifica se o último token consumido foi o EOF
-            if (tokens[tokenIndex].Lexema == T_EOF)
+            if (tokenIndex < tokens.Count && tokens[tokenIndex].Lexema == T_EOF)
             {
                 if (errosSintaticos.Count == 0)
                 {
@@ -514,7 +508,12 @@ namespace CompiladorParaConsole
             {
                 // A pilha está vazia ($ no topo), mas ainda há tokens na entrada
                 Console.WriteLine("\nAnálise Sintática concluída com erros.");
-                errosSintaticos.Add($"Erro: Tokens restantes após o fim esperado do programa na linha {tokens[tokenIndex].Linha}. Token inesperado: 	'{tokens[tokenIndex].Lexema}	'");
+
+                if (tokenIndex < tokens.Count)
+                    errosSintaticos.Add($"Erro: Tokens restantes após o fim esperado do programa na linha {tokens[tokenIndex].Linha}. Token inesperado: '{tokens[tokenIndex].Lexema}'");
+                else
+                    errosSintaticos.Add("Erro: Tokens restantes após o fim esperado do programa, mas não foi possível identificar o token pois o índice excedeu o tamanho da lista.");
+
                 MostrarErros();
                 return false;
             }
