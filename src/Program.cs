@@ -10,7 +10,6 @@ class Program
         Console.WriteLine("1: exemplo1.txt (Declarações, I/O, Comentários)");
         Console.WriteLine("2: exemplo2.txt (Procedures, If/Else, While)");
         Console.WriteLine("3: exemplo3.txt (For, Expressões)");
-        Console.WriteLine("4: codigo.txt (Código original com erros léxicos)");
         Console.Write("Digite o número da opção: ");
 
         string escolha = Console.ReadLine();
@@ -25,9 +24,6 @@ class Program
                 break;
             case "3":
                 caminhoArquivo = "exemplo3.txt";
-                break;
-            case "4":
-                caminhoArquivo = "codigo.txt";
                 break;
             default:
                 Console.WriteLine("Opção inválida. Usando 'exemplo1.txt' como padrão.");

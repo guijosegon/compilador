@@ -469,7 +469,7 @@ namespace CompiladorParaConsole
                                 pilha.Push(producao[i]);
                             }
                         }
-                        // MostrarPilha("Produção"); // Muita verbosidade
+                        //MostrarPilha("Produção"); // Muita verbosidade
                     }
                     else
                     {
@@ -576,4 +576,3 @@ namespace CompiladorParaConsole
         }
     }
 }
-

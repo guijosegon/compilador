@@ -1,0 +1,51 @@
+# Gramática Revisada (Tentativa LL(1))
+
+## Terminais:
+`program`, `ident`, `;`, `const`, `=`, `nint`, `var`, `:`, `integer`, `real`, `string`, `,`, `procedure`, `(`, `)`, `begin`, `end`, `.`, `print`, `{`, `}`, `if`, `then`, `else`, `for`, `:=`, `to`, `do`, `while`, `read`, `<>`, `<`, `>`, `<=`, `>=`, `+`, `-`, `*`, `/`, `nreal`, `literal`, `$` (EOF), `î` (epsilon)
+
+## Não-Terminais:
+`PROGRAMA`, `DECLARACOES`, `CONST_SEC`, `DEF_CONST_LIST`, `MORE_CONST`, `VAR_SEC`, `DEF_VAR_LIST`, `MORE_VAR`, `LISTAVARIAVEIS`, `LIDENT`, `TIPO`, `PROC_SEC`, `PROC_LIST`, `PROC_LIST_TAIL`, `PARÂMETROS`, `LISTAPARAM`, `PARAM_REST`, `BLOCO`, `COMANDOS`, `CMD_REST`, `COMANDO`, `CMD_IDENT_REST`, `CHAMADAPROC`, `PARAMETROSCHAMADA`, `PARAM_CHAMADA_REST`, `ELSEOPC`, `ITEMSAIDA`, `REPITEM`, `EXPRELACIONAL`, `OPREL`, `EXPRESSAO`, `EXPR'`, `TERMO`, `TER'`, `FATOR`
+
+## Regras de Produção (Refatoradas para LL(1)):
+
+1.  `PROGRAMA -> program ident ; DECLARACOES BLOCO .`
+2.  `DECLARACOES -> CONST_SEC VAR_SEC PROC_SEC`
+3.  `CONST_SEC -> const DEF_CONST_LIST | î`
+4.  `DEF_CONST_LIST -> ident = nint ; MORE_CONST`
+5.  `MORE_CONST -> ident = nint ; MORE_CONST | î`
+6.  `VAR_SEC -> var DEF_VAR_LIST | î`
+7.  `DEF_VAR_LIST -> LISTAVARIAVEIS : TIPO ; MORE_VAR`
+8.  `MORE_VAR -> LISTAVARIAVEIS : TIPO ; MORE_VAR | î`
+9.  `LISTAVARIAVEIS -> ident LIDENT`
+10. `LIDENT -> , ident LIDENT | î`
+11. `TIPO -> integer | real | string`
+12. `PROC_SEC -> PROC_LIST | î`
+13. `PROC_LIST -> procedure ident PARÂMETROS ; BLOCO ; PROC_LIST_TAIL`
+14. `PROC_LIST_TAIL -> procedure ident PARÂMETROS ; BLOCO ; PROC_LIST_TAIL | î`
+15. `PARÂMETROS -> ( LISTAPARAM ) | î`
+16. `LISTAPARAM -> ident : TIPO PARAM_REST | î`
+17. `PARAM_REST -> , ident : TIPO PARAM_REST | î`
+18. `BLOCO -> begin COMANDOS end`
+19. `COMANDOS -> COMANDO CMD_REST | î`
+20. `CMD_REST -> ; COMANDO CMD_REST | î`
+21. `COMANDO -> print { ITEMSAIDA REPITEM }`
+22. `COMANDO -> if EXPRELACIONAL then BLOCO ELSEOPC`
+23. `COMANDO -> ident CMD_IDENT_REST`
+24. `CMD_IDENT_REST -> := EXPRESSAO | CHAMADAPROC`
+25. `CHAMADAPROC -> ( PARAMETROSCHAMADA ) | î`
+26. `PARAMETROSCHAMADA -> EXPRESSAO PARAM_CHAMADA_REST | î`
+27. `PARAM_CHAMADA_REST -> , EXPRESSAO PARAM_CHAMADA_REST | î`
+28. `COMANDO -> for ident := EXPRESSAO to EXPRESSAO do BLOCO`
+29. `COMANDO -> while EXPRELACIONAL do BLOCO`
+30. `COMANDO -> read ( ident )`
+31. `ELSEOPC -> else BLOCO | î`
+32. `ITEMSAIDA -> EXPRESSAO` # Simplificado, assumindo que EXPRESSAO é o item de saída
+33. `REPITEM -> , ITEMSAIDA REPITEM | î`
+34. `EXPRELACIONAL -> EXPRESSAO OPREL EXPRESSAO`
+35. `OPREL -> = | <> | < | > | <= | >=`
+36. `EXPRESSAO -> TERMO EXPR'`
+37. `EXPR' -> + TERMO EXPR' | - TERMO EXPR' | î`
+38. `TERMO -> FATOR TER'`
+39. `TER' -> * FATOR TER' | / FATOR TER' | î`
+40. `FATOR -> ident | nint | nreal | literal | ( EXPRESSAO )`
+

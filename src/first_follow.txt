@@ -1,0 +1,77 @@
+# Conjuntos FIRST e FOLLOW (Estimativa)
+
+## FIRST Sets (Simplificado):
+- FIRST(PROGRAMA) = { program }
+- FIRST(DECLARACOES) = { const, var, procedure, î }
+- FIRST(CONST_SEC) = { const, î }
+- FIRST(DEF_CONST_LIST) = { ident }
+- FIRST(MORE_CONST) = { ident, î }
+- FIRST(VAR_SEC) = { var, î }
+- FIRST(DEF_VAR_LIST) = { ident }
+- FIRST(MORE_VAR) = { ident, î }
+- FIRST(LISTAVARIAVEIS) = { ident }
+- FIRST(LIDENT) = { ,, î }
+- FIRST(TIPO) = { integer, real, string }
+- FIRST(PROC_SEC) = { procedure, î }
+- FIRST(PROC_LIST) = { procedure }
+- FIRST(PROC_LIST_TAIL) = { procedure, î }
+- FIRST(PARÂMETROS) = { (, î }
+- FIRST(LISTAPARAM) = { ident, î }
+- FIRST(PARAM_REST) = { ,, î }
+- FIRST(BLOCO) = { begin }
+- FIRST(COMANDOS) = { print, if, ident, for, while, read, î }
+- FIRST(CMD_REST) = { ;, î }
+- FIRST(COMANDO) = { print, if, ident, for, while, read }
+- FIRST(CMD_IDENT_REST) = { :=, (, î } # î from CHAMADAPROC
+- FIRST(CHAMADAPROC) = { (, î }
+- FIRST(PARAMETROSCHAMADA) = { ident, nint, nreal, literal, (, î } # FIRST(EXPRESSAO), î
+- FIRST(PARAM_CHAMADA_REST) = { ,, î }
+- FIRST(ELSEOPC) = { else, î }
+- FIRST(ITEMSAIDA) = { ident, nint, nreal, literal, ( } # FIRST(EXPRESSAO)
+- FIRST(REPITEM) = { ,, î }
+- FIRST(EXPRELACIONAL) = { ident, nint, nreal, literal, ( } # FIRST(EXPRESSAO)
+- FIRST(OPREL) = { =, <>, <, >, <=, >= }
+- FIRST(EXPRESSAO) = { ident, nint, nreal, literal, ( }
+- FIRST(EXPR') = { +, -, î }
+- FIRST(TERMO) = { ident, nint, nreal, literal, ( }
+- FIRST(TER') = { *, /, î }
+- FIRST(FATOR) = { ident, nint, nreal, literal, ( }
+
+## FOLLOW Sets (Simplificado):
+- FOLLOW(PROGRAMA) = { $ }
+- FOLLOW(DECLARACOES) = { begin }
+- FOLLOW(CONST_SEC) = { var, procedure, begin }
+- FOLLOW(DEF_CONST_LIST) = { var, procedure, begin }
+- FOLLOW(MORE_CONST) = { var, procedure, begin }
+- FOLLOW(VAR_SEC) = { procedure, begin }
+- FOLLOW(DEF_VAR_LIST) = { procedure, begin }
+- FOLLOW(MORE_VAR) = { procedure, begin }
+- FOLLOW(LISTAVARIAVEIS) = { : }
+- FOLLOW(LIDENT) = { : }
+- FOLLOW(TIPO) = { ;, ) }
+- FOLLOW(PROC_SEC) = { begin }
+- FOLLOW(PROC_LIST) = { begin }
+- FOLLOW(PROC_LIST_TAIL) = { begin }
+- FOLLOW(PARÂMETROS) = { ; }
+- FOLLOW(LISTAPARAM) = { ) }
+- FOLLOW(PARAM_REST) = { ) }
+- FOLLOW(BLOCO) = { ., ;, else, end }
+- FOLLOW(COMANDOS) = { end }
+- FOLLOW(CMD_REST) = { end }
+- FOLLOW(COMANDO) = { ;, end }
+- FOLLOW(CMD_IDENT_REST) = { ;, end }
+- FOLLOW(CHAMADAPROC) = { ;, end }
+- FOLLOW(PARAMETROSCHAMADA) = { ) }
+- FOLLOW(PARAM_CHAMADA_REST) = { ) }
+- FOLLOW(ELSEOPC) = { ;, end }
+- FOLLOW(ITEMSAIDA) = { ,, } }
+- FOLLOW(REPITEM) = { } }
+- FOLLOW(EXPRELACIONAL) = { then, do }
+- FOLLOW(OPREL) = { ident, nint, nreal, literal, ( } # FIRST(EXPRESSAO)
+- FOLLOW(EXPRESSAO) = { =, <>, <, >, <=, >=, to, do, ;, ,, ), } } # FOLLOW(EXPRELACIONAL), FOLLOW(CMD_IDENT_REST), FOLLOW(PARAMETROSCHAMADA), FOLLOW(PARAM_CHAMADA_REST), FOLLOW(ITEMSAIDA), FOLLOW(REPITEM), FOLLOW(FATOR)
+- FOLLOW(EXPR') = { =, <>, <, >, <=, >=, to, do, ;, ,, ), } } # FOLLOW(EXPRESSAO)
+- FOLLOW(TERMO) = { +, -, =, <>, <, >, <=, >=, to, do, ;, ,, ), } } # FIRST(EXPR'), FOLLOW(EXPR')
+- FOLLOW(TER') = { +, -, =, <>, <, >, <=, >=, to, do, ;, ,, ), } } # FOLLOW(TERMO)
+- FOLLOW(FATOR) = { *, /, +, -, =, <>, <, >, <=, >=, to, do, ;, ,, ), } } # FIRST(TER'), FOLLOW(TER')
+
+*Nota: Estes conjuntos são estimativas e podem precisar de refinamento para uma tabela de parsing LL(1) completa e correta.*

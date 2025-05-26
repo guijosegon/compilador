@@ -5,8 +5,6 @@ VisualStudioVersion = 17.12.35707.178
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CompiladorParaConsole", "CompiladorParaConsole.csproj", "{D5B40546-3EE7-4DEF-94A3-D13AB1021D3C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CompiladorComInterface", "..\CompiladorComInterface\CompiladorComInterface.csproj", "{A052CF29-0BDD-45C2-A450-0D158087AEDB}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -17,10 +15,6 @@ Global
 		{D5B40546-3EE7-4DEF-94A3-D13AB1021D3C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D5B40546-3EE7-4DEF-94A3-D13AB1021D3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D5B40546-3EE7-4DEF-94A3-D13AB1021D3C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A052CF29-0BDD-45C2-A450-0D158087AEDB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A052CF29-0BDD-45C2-A450-0D158087AEDB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A052CF29-0BDD-45C2-A450-0D158087AEDB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A052CF29-0BDD-45C2-A450-0D158087AEDB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
