@@ -20,6 +20,30 @@ namespace CompiladorParaConsole
                 { "/", 34}, {".", 35}, {",", 36}, {"*", 37}, {")", 38}, {"(", 39}, {"{", 40}, {"}", 41}, {"-", 42}, {"$", 43}, {"î", 44}
             };
 
+            // Tratamento de comentários multilinha /* ... */
+            // Vamos remover os comentários multilinha e checar se todos fecham
+            int indexComentarioAberto = codigo.IndexOf("/*");
+            while (indexComentarioAberto != -1)
+            {
+                int indexComentarioFechado = codigo.IndexOf("*/", indexComentarioAberto + 2);
+                if (indexComentarioFechado == -1)
+                {
+                    // Comentário multilinha sem fechamento
+                    int linhaComentario = codigo.Substring(0, indexComentarioAberto).Split('\n').Length;
+                    Erros.Add($"[ERRO] Comentário multilinha não fechado na linha {linhaComentario}");
+                    // Remover até o fim para não travar o lexer
+                    codigo = codigo.Substring(0, indexComentarioAberto);
+                    break;
+                }
+                else
+                {
+                    // Remove o comentário
+                    codigo = codigo.Remove(indexComentarioAberto, indexComentarioFechado - indexComentarioAberto + 2);
+                    indexComentarioAberto = codigo.IndexOf("/*");
+                }
+            }
+
+            // Remover comentários de linha //
             List<string> linhasProcessadas = new List<string>();
             string[] linhasOriginais = codigo.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
             foreach (string linhaOriginal in linhasOriginais)
@@ -45,6 +69,7 @@ namespace CompiladorParaConsole
                         continue;
                     }
 
+                    // Número real com validação de casos mal formados
                     var matchFloat = Regex.Match(linha.Substring(coluna), @"^\d+\.\d+");
                     if (matchFloat.Success)
                     {
@@ -54,24 +79,93 @@ namespace CompiladorParaConsole
                         continue;
                     }
 
+                    // Número real mal formado tipo 123. (ponto sem decimais)
+                    var matchFloatMalFormadoFim = Regex.Match(linha.Substring(coluna), @"^\d+\.");
+                    if (matchFloatMalFormadoFim.Success)
+                    {
+                        string lexema = matchFloatMalFormadoFim.Value;
+                        Erros.Add($"[ERRO] Número real mal formado (falta parte decimal): '{lexema}' na linha {i + 1}");
+                        coluna += lexema.Length;
+                        continue;
+                    }
+
+                    // Número real mal formado tipo .123 (ponto sem parte inteira)
+                    var matchFloatMalFormadoInicio = Regex.Match(linha.Substring(coluna), @"^\.\d+");
+                    if (matchFloatMalFormadoInicio.Success)
+                    {
+                        string lexema = matchFloatMalFormadoInicio.Value;
+                        Erros.Add($"[ERRO] Número real mal formado (falta parte inteira): '{lexema}' na linha {i + 1}");
+                        coluna += lexema.Length;
+                        continue;
+                    }
+
+                    // Número inteiro
                     var matchInt = Regex.Match(linha.Substring(coluna), @"^\d+");
                     if (matchInt.Success)
                     {
                         string lexema = matchInt.Value;
+                        // Verificar se número seguido por letra (ex: 123a)
+                        if (coluna + lexema.Length < linha.Length && char.IsLetter(linha[coluna + lexema.Length]))
+                        {
+                            Erros.Add($"[ERRO] Número seguido de caractere inválido: '{linha.Substring(coluna, lexema.Length + 1)}' na linha {i + 1}");
+                            coluna += lexema.Length + 1;
+                            continue;
+                        }
+
                         resultado.Add(new TokenInfo(12, lexema, i + 1));
                         coluna += lexema.Length;
                         continue;
                     }
 
-                    var matchString = Regex.Match(linha.Substring(coluna), "^\"[^\"]*\"");
-                    if (matchString.Success)
+                    // String com aspas duplas
+                    if (linha[coluna] == '"')
                     {
-                        string lexema = matchString.Value;
-                        resultado.Add(new TokenInfo(13, lexema, i + 1));
-                        coluna += lexema.Length;
+                        int fimString = coluna + 1;
+                        bool escapando = false;
+                        bool erroString = false;
+                        while (fimString < linha.Length)
+                        {
+                            char c = linha[fimString];
+
+                            if (escapando)
+                            {
+                                // Aceitar escapes comuns, rejeitar escapes inválidos
+                                if ("\"\\nrt".IndexOf(c) == -1)
+                                {
+                                    Erros.Add($"[ERRO] Sequência de escape inválida: '\\{c}' na linha {i + 1}");
+                                    erroString = true;
+                                }
+                                escapando = false;
+                            }
+                            else if (c == '\\')
+                            {
+                                escapando = true;
+                            }
+                            else if (c == '"')
+                            {
+                                break; // fim da string
+                            }
+                            fimString++;
+                        }
+
+                        if (fimString >= linha.Length || linha[fimString] != '"')
+                        {
+                            Erros.Add($"[ERRO] String sem aspas finais na linha {i + 1}");
+                            coluna = linha.Length; // Pular o resto da linha
+                            continue;
+                        }
+
+                        if (!erroString)
+                        {
+                            string lexema = linha.Substring(coluna, fimString - coluna + 1);
+                            resultado.Add(new TokenInfo(13, lexema, i + 1));
+                        }
+
+                        coluna = fimString + 1;
                         continue;
                     }
 
+                    // Operadores compostos
                     string[] compostos = { ">=", "<=", ":=", "<>" };
                     bool encontrouComposto = false;
                     foreach (var op in compostos)
@@ -86,6 +180,7 @@ namespace CompiladorParaConsole
                     }
                     if (encontrouComposto) continue;
 
+                    // Símbolos simples
                     string simbolo = linha[coluna].ToString();
                     if (tabela.ContainsKey(simbolo))
                     {
@@ -94,16 +189,22 @@ namespace CompiladorParaConsole
                         continue;
                     }
 
+                    // Identificadores (letras ou _ no começo)
                     var matchIdent = Regex.Match(linha.Substring(coluna), @"^[a-zA-Z_][a-zA-Z0-9_]*");
                     if (matchIdent.Success)
                     {
                         string lexema = matchIdent.Value;
+                        if (lexema.Length > 30)
+                        {
+                            Erros.Add($"[ERRO] Identificador muito longo (>30 caracteres): '{lexema}' na linha {i + 1}");
+                        }
                         int cod = tabela.ContainsKey(lexema) ? tabela[lexema] : 16;
                         resultado.Add(new TokenInfo(cod, lexema, i + 1));
                         coluna += lexema.Length;
                         continue;
                     }
 
+                    // Se chegou aqui, é lexema inválido
                     string resto = linha.Substring(coluna).Split(' ').FirstOrDefault() ?? linha[coluna].ToString();
                     Erros.Add($"[ERRO] Lexema inválido: '{resto}' na linha {i + 1}");
                     coluna += resto.Length;
