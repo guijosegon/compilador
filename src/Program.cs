@@ -37,8 +37,11 @@ class Program
             return;
         }
 
+        Console.WriteLine("\n--- Leitura de Arquivo ---");
+
         Console.WriteLine($"\nAnalisando arquivo: {caminhoArquivo}...");
         string codigo = File.ReadAllText(caminhoArquivo);
+        Console.WriteLine($"\nConteudo de arquivo: \n {codigo} \n");
 
         // --- Análise Léxica ---
         Console.WriteLine("\n--- Análise Léxica ---");
