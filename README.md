@@ -2,6 +2,8 @@
 
 Este projeto implementa as fases iniciais de um compilador para uma linguagem de programação simples, focando na análise léxica e na análise sintática descendente preditiva tabular (LL(1)).
 
+![Tela Inicial](https://raw.githubusercontent.com/guijosegon/project-assets/master/Compilador/inicio.png)
+
 ## Funcionalidades
 
 *   **Análise Léxica:** Identifica tokens na linguagem fonte com base em expressões regulares e uma tabela de símbolos. Reporta erros léxicos encontrados.
