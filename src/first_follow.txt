@@ -2,40 +2,41 @@
 
 ## FIRST Sets (Simplificado):
 - FIRST(PROGRAMA) = { program }
-- FIRST(DECLARACOES) = { const, var, procedure, î }
-- FIRST(CONST_SEC) = { const, î }
+- FIRST(DECLARACOES) = { const, var, procedure, ï¿½ }
+- FIRST(CONST_SEC) = { const, ï¿½ }
 - FIRST(DEF_CONST_LIST) = { ident }
-- FIRST(MORE_CONST) = { ident, î }
-- FIRST(VAR_SEC) = { var, î }
+- FIRST(MORE_CONST) = { ident, ï¿½ }
+- FIRST(VAR_SEC) = { var, ï¿½ }
 - FIRST(DEF_VAR_LIST) = { ident }
-- FIRST(MORE_VAR) = { ident, î }
+- FIRST(MORE_VAR) = { ident, ï¿½ }
 - FIRST(LISTAVARIAVEIS) = { ident }
-- FIRST(LIDENT) = { ,, î }
+- FIRST(LIDENT) = { ,, ï¿½ }
 - FIRST(TIPO) = { integer, real, string }
-- FIRST(PROC_SEC) = { procedure, î }
+- FIRST(PROC_SEC) = { procedure, ï¿½ }
 - FIRST(PROC_LIST) = { procedure }
-- FIRST(PROC_LIST_TAIL) = { procedure, î }
-- FIRST(PARÂMETROS) = { (, î }
-- FIRST(LISTAPARAM) = { ident, î }
-- FIRST(PARAM_REST) = { ,, î }
-- FIRST(BLOCO) = { begin }
-- FIRST(COMANDOS) = { print, if, ident, for, while, read, î }
-- FIRST(CMD_REST) = { ;, î }
+- FIRST(PROC_LIST_TAIL) = { procedure, ï¿½ }
+- FIRST(PARï¿½METROS) = { (, ï¿½ }
+- FIRST(LISTAPARAM) = { ident, ï¿½ }
+- FIRST(PARAM_REST) = { ,, ï¿½ }
+- FIRST(BLOCO) = { var, begin }
+- FIRST(COMANDOS) = { print, if, ident, for, while, read, ï¿½ }
+- FIRST(CMD_REST) = { ;, ï¿½ }
 - FIRST(COMANDO) = { print, if, ident, for, while, read }
-- FIRST(CMD_IDENT_REST) = { :=, (, î } # î from CHAMADAPROC
-- FIRST(CHAMADAPROC) = { (, î }
-- FIRST(PARAMETROSCHAMADA) = { ident, nint, nreal, literal, (, î } # FIRST(EXPRESSAO), î
-- FIRST(PARAM_CHAMADA_REST) = { ,, î }
-- FIRST(ELSEOPC) = { else, î }
+- FIRST(CMD_IDENT_REST) = { :=, (, ï¿½ } # ï¿½ from CHAMADAPROC
+- FIRST(CHAMADAPROC) = { (, ï¿½ }
+- FIRST(PARAMETROSCHAMADA) = { ident, nint, nreal, literal, (, ï¿½ } # FIRST(EXPRESSAO), ï¿½
+- FIRST(PARAM_CHAMADA_REST) = { ,, ï¿½ }
+- FIRST(ELSEOPC) = { else, ï¿½ }
 - FIRST(ITEMSAIDA) = { ident, nint, nreal, literal, ( } # FIRST(EXPRESSAO)
-- FIRST(REPITEM) = { ,, î }
+- FIRST(REPITEM) = { ,, ï¿½ }
 - FIRST(EXPRELACIONAL) = { ident, nint, nreal, literal, ( } # FIRST(EXPRESSAO)
 - FIRST(OPREL) = { =, <>, <, >, <=, >= }
 - FIRST(EXPRESSAO) = { ident, nint, nreal, literal, ( }
-- FIRST(EXPR') = { +, -, î }
+- FIRST(EXPR') = { +, -, ï¿½ }
 - FIRST(TERMO) = { ident, nint, nreal, literal, ( }
-- FIRST(TER') = { *, /, î }
+- FIRST(TER') = { *, /, ï¿½ }
 - FIRST(FATOR) = { ident, nint, nreal, literal, ( }
+- FIRST(VAR_SEC_LOCAL) = { var, Ã® }
 
 ## FOLLOW Sets (Simplificado):
 - FOLLOW(PROGRAMA) = { $ }
@@ -52,7 +53,7 @@
 - FOLLOW(PROC_SEC) = { begin }
 - FOLLOW(PROC_LIST) = { begin }
 - FOLLOW(PROC_LIST_TAIL) = { begin }
-- FOLLOW(PARÂMETROS) = { ; }
+- FOLLOW(PARï¿½METROS) = { ; }
 - FOLLOW(LISTAPARAM) = { ) }
 - FOLLOW(PARAM_REST) = { ) }
 - FOLLOW(BLOCO) = { ., ;, else, end }
@@ -73,5 +74,4 @@
 - FOLLOW(TERMO) = { +, -, =, <>, <, >, <=, >=, to, do, ;, ,, ), } } # FIRST(EXPR'), FOLLOW(EXPR')
 - FOLLOW(TER') = { +, -, =, <>, <, >, <=, >=, to, do, ;, ,, ), } } # FOLLOW(TERMO)
 - FOLLOW(FATOR) = { *, /, +, -, =, <>, <, >, <=, >=, to, do, ;, ,, ), } } # FIRST(TER'), FOLLOW(TER')
-
-*Nota: Estes conjuntos são estimativas e podem precisar de refinamento para uma tabela de parsing LL(1) completa e correta.*
+- FOLLOW(VAR_SEC_LOCAL) = { begin }

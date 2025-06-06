@@ -91,6 +91,7 @@ namespace CompiladorParaConsole
         private const string NT_TERMO = "TERMO";
         private const string NT_TER_PRIME = "TER'";
         private const string NT_FATOR = "FATOR";
+        private const string NT_VAR_SEC_LOCAL = "VAR_SEC_LOCAL";
 
 
         public AnalisadorSintatico()
@@ -120,7 +121,7 @@ namespace CompiladorParaConsole
                 NT_PROC_LIST_TAIL, NT_PARAMETROS, NT_LISTAPARAM, NT_PARAM_REST, NT_BLOCO, NT_COMANDOS,
                 NT_CMD_REST, NT_COMANDO, NT_CMD_IDENT_REST, NT_CHAMADAPROC, NT_PARAMETROSCHAMADA,
                 NT_PARAM_CHAMADA_REST, NT_ELSEOPC, NT_ITEMSAIDA, NT_REPITEM, NT_EXPRELACIONAL, NT_OPREL,
-                NT_EXPRESSAO, NT_EXPR_PRIME, NT_TERMO, NT_TER_PRIME, NT_FATOR
+                NT_EXPRESSAO, NT_EXPR_PRIME, NT_TERMO, NT_TER_PRIME, NT_FATOR, NT_VAR_SEC_LOCAL
             };
         }
 
@@ -137,6 +138,11 @@ namespace CompiladorParaConsole
         private void InicializarTabelaParsing()
         {
             tabelaParsing = new Dictionary<(string, string), string[]>();
+
+            // VAR_SEC_LOCAL -> var DEF_VAR_LIST VAR_SEC_LOCAL
+            AddEntry(NT_VAR_SEC_LOCAL, T_VAR, T_VAR, NT_DEF_VAR_LIST, NT_VAR_SEC_LOCAL);
+            // VAR_SEC_LOCAL -> î
+            AddEntry(NT_VAR_SEC_LOCAL, T_BEGIN, T_EPSILON);
 
             // Regra 1: PROGRAMA -> program ident ; DECLARACOES BLOCO .
             AddEntry(NT_PROGRAMA, T_PROGRAM, T_PROGRAM, T_IDENT, T_SEMICOLON, NT_DECLARACOES, NT_BLOCO, T_DOT);
@@ -226,8 +232,9 @@ namespace CompiladorParaConsole
             AddEntry(NT_PARAM_REST, T_COMMA, T_COMMA, T_IDENT, T_COLON, NT_TIPO, NT_PARAM_REST);
             AddEntry(NT_PARAM_REST, T_RPAREN, T_EPSILON);
 
-            // Regra 18: BLOCO -> begin COMANDOS end
-            AddEntry(NT_BLOCO, T_BEGIN, T_BEGIN, NT_COMANDOS, T_END);
+            // Regra 18 (nova): BLOCO -> VAR_SEC_LOCAL begin COMANDOS end
+            AddEntry(NT_BLOCO, T_VAR,   NT_VAR_SEC_LOCAL, T_BEGIN, NT_COMANDOS, T_END);
+            AddEntry(NT_BLOCO, T_BEGIN, NT_VAR_SEC_LOCAL, T_BEGIN, NT_COMANDOS, T_END);
 
             // Regra 19: COMANDOS -> COMANDO CMD_REST | î
             // FIRST(COMANDO) = {print, if, ident, for, while, read}
@@ -402,8 +409,6 @@ namespace CompiladorParaConsole
             AddEntry(NT_FATOR, T_NREAL, T_NREAL);
             AddEntry(NT_FATOR, T_LITERAL, T_LITERAL);
             AddEntry(NT_FATOR, T_LPAREN, T_LPAREN, NT_EXPRESSAO, T_RPAREN);
-
-            // TODO: Verificar conflitos e completar a tabela. Esta é uma implementação parcial.
         }
 
         public bool Analisar(List<TokenInfo> tokensEntrada)

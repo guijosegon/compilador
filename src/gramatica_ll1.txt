@@ -25,7 +25,7 @@
 15. `PARÂMETROS -> ( LISTAPARAM ) | î`
 16. `LISTAPARAM -> ident : TIPO PARAM_REST | î`
 17. `PARAM_REST -> , ident : TIPO PARAM_REST | î`
-18. `BLOCO -> begin COMANDOS end`
+18. `BLOCO -> VAR_SEC_LOCAL begin COMANDOS end`
 19. `COMANDOS -> COMANDO CMD_REST | î`
 20. `CMD_REST -> ; COMANDO CMD_REST | î`
 21. `COMANDO -> print { ITEMSAIDA REPITEM }`
@@ -48,4 +48,4 @@
 38. `TERMO -> FATOR TER'`
 39. `TER' -> * FATOR TER' | / FATOR TER' | î`
 40. `FATOR -> ident | nint | nreal | literal | ( EXPRESSAO )`
-
+41. `VAR_SEC_LOCAL -> var DEF_VAR_LIST VAR_SEC_LOCAL | î`
