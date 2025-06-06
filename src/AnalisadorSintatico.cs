@@ -256,8 +256,8 @@ namespace CompiladorParaConsole
             // Regra 21: COMANDO -> print { ITEMSAIDA REPITEM }
             AddEntry(NT_COMANDO, T_PRINT, T_PRINT, T_LBRACE, NT_ITEMSAIDA, NT_REPITEM, T_RBRACE);
 
-            // Regra 22: COMANDO -> if EXPRELACIONAL then BLOCO ELSEOPC
-            AddEntry(NT_COMANDO, T_IF, T_IF, NT_EXPRELACIONAL, T_THEN, NT_BLOCO, NT_ELSEOPC);
+            // Regra 22: COMANDO -> if ( EXPRELACIONAL ) then BLOCO ELSEOPC
+            AddEntry(NT_COMANDO, T_IF, T_IF, T_LPAREN, NT_EXPRELACIONAL, T_RPAREN,  T_THEN, NT_BLOCO, NT_ELSEOPC);
 
             // Regra 23: COMANDO -> ident CMD_IDENT_REST
             AddEntry(NT_COMANDO, T_IDENT, T_IDENT, NT_CMD_IDENT_REST);
@@ -301,8 +301,8 @@ namespace CompiladorParaConsole
             // Regra 28: COMANDO -> for ident := EXPRESSAO to EXPRESSAO do BLOCO
             AddEntry(NT_COMANDO, T_FOR, T_FOR, T_IDENT, T_ASSIGN, NT_EXPRESSAO, T_TO, NT_EXPRESSAO, T_DO, NT_BLOCO);
 
-            // Regra 29: COMANDO -> while EXPRELACIONAL do BLOCO
-            AddEntry(NT_COMANDO, T_WHILE, T_WHILE, NT_EXPRELACIONAL, T_DO, NT_BLOCO);
+            // Regra 29: COMANDO -> while ( EXPRELACIONAL ) do BLOCO
+            AddEntry(NT_COMANDO, T_WHILE, T_WHILE, T_LPAREN, NT_EXPRELACIONAL, T_RPAREN, T_DO, NT_BLOCO);
 
             // Regra 30: COMANDO -> read ( ident )
             AddEntry(NT_COMANDO, T_READ, T_READ, T_LPAREN, T_IDENT, T_RPAREN);
