@@ -20,30 +20,24 @@ namespace CompiladorParaConsole
                 { "/", 34}, {".", 35}, {",", 36}, {"*", 37}, {")", 38}, {"(", 39}, {"{", 40}, {"}", 41}, {"-", 42}, {"$", 43}, {"î", 44}
             };
 
-            // Tratamento de comentários multilinha /* ... */
-            // Vamos remover os comentários multilinha e checar se todos fecham
             int indexComentarioAberto = codigo.IndexOf("/*");
             while (indexComentarioAberto != -1)
             {
                 int indexComentarioFechado = codigo.IndexOf("*/", indexComentarioAberto + 2);
                 if (indexComentarioFechado == -1)
                 {
-                    // Comentário multilinha sem fechamento
                     int linhaComentario = codigo.Substring(0, indexComentarioAberto).Split('\n').Length;
                     Erros.Add($"[ERRO] Comentário multilinha não fechado na linha {linhaComentario}");
-                    // Remover até o fim para não travar o lexer
                     codigo = codigo.Substring(0, indexComentarioAberto);
                     break;
                 }
                 else
                 {
-                    // Remove o comentário
                     codigo = codigo.Remove(indexComentarioAberto, indexComentarioFechado - indexComentarioAberto + 2);
                     indexComentarioAberto = codigo.IndexOf("/*");
                 }
             }
 
-            // Remover comentários de linha //
             List<string> linhasProcessadas = new List<string>();
             string[] linhasOriginais = codigo.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
             foreach (string linhaOriginal in linhasOriginais)

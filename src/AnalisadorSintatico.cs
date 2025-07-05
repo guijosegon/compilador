@@ -5,14 +5,37 @@ namespace CompiladorParaConsole
         private List<TokenInfo> tokens;
         private int tokenIndex;
         private Stack<string> pilha;
-        private Dictionary<(string, string), string[]> tabelaParsing; // (Não-Terminal, Terminal) -> Produção
+        private Dictionary<(string, string), string[]> tabelaParsing;
         private List<string> errosSintaticos;
 
-        // Conjuntos de terminais e não-terminais (baseado no manual)
+        private AnalisadorSemantico analisadorSemantico;
+        private TokenInfo tokenLidoAnteriormente; // Guarda o último token terminal lido (ident, nint, etc.)
+        private string tipoAtual; // Guarda o tipo lido em uma declaração (integer, real, etc.)
+        private List<TokenInfo> identificadoresParaDeclarar = new List<TokenInfo>(); // Lista para declarações (ex: var x, y: integer)
+        private TokenInfo identificadorConstante; // Armazena o ident de uma constante sendo declarada
+        private TokenInfo identificadorProcedure; // Armazena o ident de uma procedure sendo declarada
+        private List<TokenInfo> parametrosParaDeclarar = new List<TokenInfo>(); // Lista para parâmetros de procedure
+
+        private const string ACAO_INSERIR_CONST = "#ACAO_INSERIR_CONST";
+        private const string ACAO_INSERIR_VAR_LISTA = "#ACAO_INSERIR_VAR_LISTA";
+        private const string ACAO_INSERIR_PROC = "#ACAO_INSERIR_PROC";
+        private const string ACAO_INSERIR_PARAM_LISTA = "#ACAO_INSERIR_PARAM_LISTA";
+        private const string ACAO_VERIFICAR_DECL = "#ACAO_VERIFICAR_DECL";
+        private const string ACAO_VERIFICAR_ATRIB = "#ACAO_VERIFICAR_ATRIB";
+        private const string ACAO_EMPILHAR_TIPO = "#ACAO_EMPILHAR_TIPO";
+        private const string ACAO_CHECAR_OP_ARIT = "#ACAO_CHECAR_OP_ARIT";
+        private const string ACAO_INICIAR_ESCOPO = "#ACAO_INICIAR_ESCOPO";
+        private const string ACAO_FINALIZAR_ESCOPO = "#ACAO_FINALIZAR_ESCOPO";
+        private const string ACAO_GUARDAR_TIPO = "#ACAO_GUARDAR_TIPO";
+        private const string ACAO_GUARDAR_IDENT_PARA_DECL = "#ACAO_GUARDAR_IDENT_PARA_DECL";
+        private const string ACAO_GUARDAR_IDENT_PARA_CONST = "#ACAO_GUARDAR_IDENT_PARA_CONST";
+        private const string ACAO_GUARDAR_IDENT_PARA_PROC = "#ACAO_GUARDAR_IDENT_PARA_PROC";
+        private const string ACAO_GUARDAR_IDENT_PARA_PARAM = "#ACAO_GUARDAR_IDENT_PARA_PARAM";
+        private const string ACAO_GUARDAR_IDENT_PARA_USO = "#ACAO_GUARDAR_IDENT_PARA_USO";
+
         private HashSet<string> terminais;
         private HashSet<string> naoTerminais;
 
-        // Constantes para nomes de não-terminais e terminais para evitar erros de digitação
         private const string T_PROGRAM = "program";
         private const string T_IDENT = "ident";
         private const string T_SEMICOLON = ";";
@@ -93,18 +116,17 @@ namespace CompiladorParaConsole
         private const string NT_FATOR = "FATOR";
         private const string NT_VAR_SEC_LOCAL = "VAR_SEC_LOCAL";
 
-
         public AnalisadorSintatico()
         {
             pilha = new Stack<string>();
             errosSintaticos = new List<string>();
+            analisadorSemantico = new AnalisadorSemantico();
             InicializarConjuntos();
-            InicializarTabelaParsing(); // Chama a inicialização da tabela
+            InicializarTabelaParsing();
         }
 
         private void InicializarConjuntos()
         {
-            // Baseado nos tokens e regras do manual
             terminais = new HashSet<string>
             {
                 T_PROGRAM, T_IDENT, T_SEMICOLON, T_CONST, T_EQ, T_NINT, T_VAR, T_COLON, T_INTEGER, T_REAL, T_STRING,
@@ -113,7 +135,6 @@ namespace CompiladorParaConsole
                 T_PLUS, T_MINUS, T_MULT, T_DIV, T_NREAL, T_LITERAL, T_EOF
             };
 
-            // Baseado nas regras do manual (usando constantes)
             naoTerminais = new HashSet<string>
             {
                 NT_PROGRAMA, NT_DECLARACOES, NT_CONST_SEC, NT_DEF_CONST_LIST, NT_MORE_CONST, NT_VAR_SEC,
@@ -127,11 +148,6 @@ namespace CompiladorParaConsole
 
         private void AddEntry(string nonTerminal, string terminal, params string[] production)
         {
-            if (!naoTerminais.Contains(nonTerminal))
-                throw new ArgumentException($"Erro interno: Não-terminal desconhecido 	'{nonTerminal}	'");
-            if (!terminais.Contains(terminal) && terminal != T_EPSILON) // Epsilon não está no conjunto de terminais
-                throw new ArgumentException($"Erro interno: Terminal desconhecido 	'{terminal}	'");
-
             tabelaParsing.Add((nonTerminal, terminal), production);
         }
 
@@ -145,100 +161,79 @@ namespace CompiladorParaConsole
             AddEntry(NT_VAR_SEC_LOCAL, T_BEGIN, T_EPSILON);
 
             // Regra 1: PROGRAMA -> program ident ; DECLARACOES BLOCO .
+            // O bloco principal do programa é o escopo global (Nível 0), não precisa de Iniciar/FinalizarEscopo aqui.
             AddEntry(NT_PROGRAMA, T_PROGRAM, T_PROGRAM, T_IDENT, T_SEMICOLON, NT_DECLARACOES, NT_BLOCO, T_DOT);
 
             // Regra 2: DECLARACOES -> CONST_SEC VAR_SEC PROC_SEC
-            // FIRST(CONST_SEC) = {const, î}, FIRST(VAR_SEC) = {var, î}, FIRST(PROC_SEC) = {procedure, î}
-            // FIRST(DECLARACOES) = FIRST(CONST_SEC) U FIRST(VAR_SEC) U FIRST(PROC_SEC) = {const, var, procedure, î}
-            // FOLLOW(DECLARACOES) = {begin}
             AddEntry(NT_DECLARACOES, T_CONST, NT_CONST_SEC, NT_VAR_SEC, NT_PROC_SEC);
-            AddEntry(NT_DECLARACOES, T_VAR, NT_CONST_SEC, NT_VAR_SEC, NT_PROC_SEC); // î for CONST_SEC
-            AddEntry(NT_DECLARACOES, T_PROCEDURE, NT_CONST_SEC, NT_VAR_SEC, NT_PROC_SEC); // î for CONST_SEC, VAR_SEC
-            AddEntry(NT_DECLARACOES, T_BEGIN, NT_CONST_SEC, NT_VAR_SEC, NT_PROC_SEC); // î for CONST_SEC, VAR_SEC, PROC_SEC (FOLLOW)
+            AddEntry(NT_DECLARACOES, T_VAR, NT_CONST_SEC, NT_VAR_SEC, NT_PROC_SEC);
+            AddEntry(NT_DECLARACOES, T_PROCEDURE, NT_CONST_SEC, NT_VAR_SEC, NT_PROC_SEC);
+            AddEntry(NT_DECLARACOES, T_BEGIN, NT_CONST_SEC, NT_VAR_SEC, NT_PROC_SEC);
 
             // Regra 3: CONST_SEC -> const DEF_CONST_LIST | î
-            // FIRST(const DEF_CONST_LIST) = {const}
-            // FOLLOW(CONST_SEC) = {var, procedure, begin}
             AddEntry(NT_CONST_SEC, T_CONST, T_CONST, NT_DEF_CONST_LIST);
             AddEntry(NT_CONST_SEC, T_VAR, T_EPSILON);
             AddEntry(NT_CONST_SEC, T_PROCEDURE, T_EPSILON);
             AddEntry(NT_CONST_SEC, T_BEGIN, T_EPSILON);
 
-            // Regra 4: DEF_CONST_LIST -> ident = nint ; MORE_CONST
-            AddEntry(NT_DEF_CONST_LIST, T_IDENT, T_IDENT, T_EQ, T_NINT, T_SEMICOLON, NT_MORE_CONST);
+            // Regra 4: DEF_CONST_LIST -> ident #ACAO_GUARDAR_IDENT_PARA_CONST = nint #ACAO_INSERIR_CONST ; MORE_CONST
+            AddEntry(NT_DEF_CONST_LIST, T_IDENT, T_IDENT, ACAO_GUARDAR_IDENT_PARA_CONST, T_EQ, T_NINT, ACAO_INSERIR_CONST, T_SEMICOLON, NT_MORE_CONST);
 
-            // Regra 5: MORE_CONST -> ident = nint ; MORE_CONST | î
-            // FIRST(ident...) = {ident}
-            // FOLLOW(MORE_CONST) = FOLLOW(CONST_SEC) = {var, procedure, begin}
-            AddEntry(NT_MORE_CONST, T_IDENT, T_IDENT, T_EQ, T_NINT, T_SEMICOLON, NT_MORE_CONST);
+            // Regra 5: MORE_CONST -> ident #ACAO_GUARDAR_IDENT_PARA_CONST = nint #ACAO_INSERIR_CONST ; MORE_CONST | î
+            AddEntry(NT_MORE_CONST, T_IDENT, T_IDENT, ACAO_GUARDAR_IDENT_PARA_CONST, T_EQ, T_NINT, ACAO_INSERIR_CONST, T_SEMICOLON, NT_MORE_CONST);
             AddEntry(NT_MORE_CONST, T_VAR, T_EPSILON);
             AddEntry(NT_MORE_CONST, T_PROCEDURE, T_EPSILON);
             AddEntry(NT_MORE_CONST, T_BEGIN, T_EPSILON);
 
-            // Regra 6: VAR_SEC -> var DEF_VAR_LIST  NT_VAR_SEC| î
-            // FIRST(var...) = {var}
-            // FOLLOW(VAR_SEC) = {procedure, begin}
+            // Regra 6: VAR_SEC -> var DEF_VAR_LIST VAR_SEC | î
             AddEntry(NT_VAR_SEC, T_VAR, T_VAR, NT_DEF_VAR_LIST, NT_VAR_SEC);
             AddEntry(NT_VAR_SEC, T_PROCEDURE, T_EPSILON);
             AddEntry(NT_VAR_SEC, T_BEGIN, T_EPSILON);
 
-            // Regra 7: DEF_VAR_LIST -> LISTAVARIAVEIS : TIPO ;
-            AddEntry(NT_DEF_VAR_LIST, T_IDENT, NT_LISTAVARIAVEIS, T_COLON, NT_TIPO, T_SEMICOLON);
+            // Regra 7: DEF_VAR_LIST -> LISTAVARIAVEIS : TIPO ; #ACAO_INSERIR_VAR_LISTA
+            AddEntry(NT_DEF_VAR_LIST, T_IDENT, NT_LISTAVARIAVEIS, T_COLON, NT_TIPO, T_SEMICOLON, ACAO_INSERIR_VAR_LISTA);
 
-            // Regra 9: LISTAVARIAVEIS -> ident LIDENT
-            AddEntry(NT_LISTAVARIAVEIS, T_IDENT, T_IDENT, NT_LIDENT);
+            // Regra 9: LISTAVARIAVEIS -> ident #ACAO_GUARDAR_IDENT_PARA_DECL LIDENT
+            AddEntry(NT_LISTAVARIAVEIS, T_IDENT, T_IDENT, ACAO_GUARDAR_IDENT_PARA_DECL, NT_LIDENT);
 
-            // Regra 10: LIDENT -> , ident LIDENT | î
-            // FIRST(,) = {,}
-            // FOLLOW(LIDENT) = { : }
-            AddEntry(NT_LIDENT, T_COMMA, T_COMMA, T_IDENT, NT_LIDENT);
+            // Regra 10: LIDENT -> , ident #ACAO_GUARDAR_IDENT_PARA_DECL LIDENT | î
+            AddEntry(NT_LIDENT, T_COMMA, T_COMMA, T_IDENT, ACAO_GUARDAR_IDENT_PARA_DECL, NT_LIDENT);
             AddEntry(NT_LIDENT, T_COLON, T_EPSILON);
 
-            // Regra 11: TIPO -> integer | real | string
-            AddEntry(NT_TIPO, T_INTEGER, T_INTEGER);
-            AddEntry(NT_TIPO, T_REAL, T_REAL);
-            AddEntry(NT_TIPO, T_STRING, T_STRING);
+            // Regra 11: TIPO -> (integer | real | string) #ACAO_GUARDAR_TIPO
+            AddEntry(NT_TIPO, T_INTEGER, T_INTEGER, ACAO_GUARDAR_TIPO);
+            AddEntry(NT_TIPO, T_REAL, T_REAL, ACAO_GUARDAR_TIPO);
+            AddEntry(NT_TIPO, T_STRING, T_STRING, ACAO_GUARDAR_TIPO);
 
             // Regra 12: PROC_SEC -> PROC_LIST | î
-            // FIRST(PROC_LIST) = {procedure}
-            // FOLLOW(PROC_SEC) = {begin}
             AddEntry(NT_PROC_SEC, T_PROCEDURE, NT_PROC_LIST);
             AddEntry(NT_PROC_SEC, T_BEGIN, T_EPSILON);
 
-            // Regra 13: PROC_LIST -> procedure ident PARÂMETROS ; BLOCO ; PROC_LIST_TAIL
-            AddEntry(NT_PROC_LIST, T_PROCEDURE, T_PROCEDURE, T_IDENT, NT_PARAMETROS, T_SEMICOLON, NT_BLOCO, T_SEMICOLON, NT_PROC_LIST_TAIL);
+            // Regra 13: PROC_LIST -> procedure ident #ACAO_GUARDAR_IDENT_PARA_PROC #ACAO_INSERIR_PROC #ACAO_INICIAR_ESCOPO PARÂMETROS #ACAO_INSERIR_PARAM_LISTA ; BLOCO #ACAO_FINALIZAR_ESCOPO ; PROC_LIST_TAIL
+            AddEntry(NT_PROC_LIST, T_PROCEDURE, T_PROCEDURE, T_IDENT, ACAO_GUARDAR_IDENT_PARA_PROC, ACAO_INSERIR_PROC, ACAO_INICIAR_ESCOPO, NT_PARAMETROS, ACAO_INSERIR_PARAM_LISTA, T_SEMICOLON, NT_BLOCO, ACAO_FINALIZAR_ESCOPO, T_SEMICOLON, NT_PROC_LIST_TAIL);
 
-            // Regra 14: PROC_LIST_TAIL -> procedure ident PARÂMETROS ; BLOCO ; PROC_LIST_TAIL | î
-            // FIRST(procedure...) = {procedure}
-            // FOLLOW(PROC_LIST_TAIL) = FOLLOW(PROC_SEC) = {begin}
-            AddEntry(NT_PROC_LIST_TAIL, T_PROCEDURE, T_PROCEDURE, T_IDENT, NT_PARAMETROS, T_SEMICOLON, NT_BLOCO, T_SEMICOLON, NT_PROC_LIST_TAIL);
+            // Regra 14: PROC_LIST_TAIL -> procedure ident #ACAO_GUARDAR_IDENT_PARA_PROC #ACAO_INSERIR_PROC #ACAO_INICIAR_ESCOPO PARÂMETROS #ACAO_INSERIR_PARAM_LISTA ; BLOCO #ACAO_FINALIZAR_ESCOPO ; PROC_LIST_TAIL | î
+            AddEntry(NT_PROC_LIST_TAIL, T_PROCEDURE, T_PROCEDURE, T_IDENT, ACAO_GUARDAR_IDENT_PARA_PROC, ACAO_INSERIR_PROC, ACAO_INICIAR_ESCOPO, NT_PARAMETROS, ACAO_INSERIR_PARAM_LISTA, T_SEMICOLON, NT_BLOCO, ACAO_FINALIZAR_ESCOPO, T_SEMICOLON, NT_PROC_LIST_TAIL);
             AddEntry(NT_PROC_LIST_TAIL, T_BEGIN, T_EPSILON);
 
             // Regra 15: PARÂMETROS -> ( LISTAPARAM ) | î
-            // FIRST(() = { ( }
-            // FOLLOW(PARÂMETROS) = { ; }
             AddEntry(NT_PARAMETROS, T_LPAREN, T_LPAREN, NT_LISTAPARAM, T_RPAREN);
             AddEntry(NT_PARAMETROS, T_SEMICOLON, T_EPSILON);
 
-            // Regra 16: LISTAPARAM -> ident : TIPO PARAM_REST | î
-            // FIRST(ident...) = {ident}
-            // FOLLOW(LISTAPARAM) = { ) }
-            AddEntry(NT_LISTAPARAM, T_IDENT, T_IDENT, T_COLON, NT_TIPO, NT_PARAM_REST);
+            // Regra 16: LISTAPARAM -> ident #ACAO_GUARDAR_IDENT_PARA_PARAM : TIPO #ACAO_GUARDAR_TIPO PARAM_REST | î
+            AddEntry(NT_LISTAPARAM, T_IDENT, T_IDENT, ACAO_GUARDAR_IDENT_PARA_PARAM, T_COLON, NT_TIPO, ACAO_GUARDAR_TIPO, NT_PARAM_REST);
             AddEntry(NT_LISTAPARAM, T_RPAREN, T_EPSILON);
 
-            // Regra 17: PARAM_REST -> , ident : TIPO PARAM_REST | î
-            // FIRST(,) = {,}
-            // FOLLOW(PARAM_REST) = { ) }
-            AddEntry(NT_PARAM_REST, T_COMMA, T_COMMA, T_IDENT, T_COLON, NT_TIPO, NT_PARAM_REST);
+            // Regra 17: PARAM_REST -> , ident #ACAO_GUARDAR_IDENT_PARA_PARAM : TIPO #ACAO_GUARDAR_TIPO PARAM_REST | î
+            AddEntry(NT_PARAM_REST, T_COMMA, T_COMMA, T_IDENT, ACAO_GUARDAR_IDENT_PARA_PARAM, T_COLON, NT_TIPO, ACAO_GUARDAR_TIPO, NT_PARAM_REST);
             AddEntry(NT_PARAM_REST, T_RPAREN, T_EPSILON);
 
-            // Regra 18 (nova): BLOCO -> VAR_SEC_LOCAL begin COMANDOS end
-            AddEntry(NT_BLOCO, T_VAR,   NT_VAR_SEC_LOCAL, T_BEGIN, NT_COMANDOS, T_END);
+            // Regra 18: BLOCO -> VAR_SEC_LOCAL begin COMANDOS end
+            // Removidas as ações de escopo daqui, pois o escopo é gerenciado pela regra que chama BLOCO.
+            AddEntry(NT_BLOCO, T_VAR, NT_VAR_SEC_LOCAL, T_BEGIN, NT_COMANDOS, T_END);
             AddEntry(NT_BLOCO, T_BEGIN, NT_VAR_SEC_LOCAL, T_BEGIN, NT_COMANDOS, T_END);
 
             // Regra 19: COMANDOS -> COMANDO CMD_REST | î
-            // FIRST(COMANDO) = {print, if, ident, for, while, read}
-            // FOLLOW(COMANDOS) = {end}
             AddEntry(NT_COMANDOS, T_PRINT, NT_COMANDO, NT_CMD_REST);
             AddEntry(NT_COMANDOS, T_IF, NT_COMANDO, NT_CMD_REST);
             AddEntry(NT_COMANDOS, T_IDENT, NT_COMANDO, NT_CMD_REST);
@@ -248,43 +243,32 @@ namespace CompiladorParaConsole
             AddEntry(NT_COMANDOS, T_END, T_EPSILON);
 
             // Regra 20: CMD_REST -> ; COMANDO CMD_REST | î
-            // FIRST(;) = {;}
-            // FOLLOW(CMD_REST) = {end}
             AddEntry(NT_CMD_REST, T_SEMICOLON, T_SEMICOLON, NT_COMANDO, NT_CMD_REST);
             AddEntry(NT_CMD_REST, T_END, T_EPSILON);
 
             // Regra 21: COMANDO -> print { ITEMSAIDA REPITEM }
             AddEntry(NT_COMANDO, T_PRINT, T_PRINT, T_LBRACE, NT_ITEMSAIDA, NT_REPITEM, T_RBRACE);
 
-            // Regra 22: COMANDO -> if ( EXPRELACIONAL ) then BLOCO ELSEOPC
-            AddEntry(NT_COMANDO, T_IF, T_IF, T_LPAREN, NT_EXPRELACIONAL, T_RPAREN,  T_THEN, NT_BLOCO, NT_ELSEOPC);
+            // Regra 22: COMANDO -> if ( EXPRELACIONAL ) then #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO ELSEOPC
+            AddEntry(NT_COMANDO, T_IF, T_IF, T_LPAREN, NT_EXPRELACIONAL, T_RPAREN, T_THEN, ACAO_INICIAR_ESCOPO, NT_BLOCO, ACAO_FINALIZAR_ESCOPO, NT_ELSEOPC);
 
-            // Regra 23: COMANDO -> ident CMD_IDENT_REST
-            AddEntry(NT_COMANDO, T_IDENT, T_IDENT, NT_CMD_IDENT_REST);
+            // Regra 23: COMANDO -> ident #ACAO_GUARDAR_IDENT_PARA_USO CMD_IDENT_REST
+            AddEntry(NT_COMANDO, T_IDENT, T_IDENT, ACAO_GUARDAR_IDENT_PARA_USO, NT_CMD_IDENT_REST);
 
-            // Regra 23b: COMANDO -> ε  (quando vier 'end')
+            // Regra 23b: COMANDO -> ε (quando vier 'end')
             AddEntry(NT_COMANDO, T_END, T_EPSILON);
 
-            // Regra 24: CMD_IDENT_REST -> := EXPRESSAO | CHAMADAPROC
-            // FIRST(:= EXPRESSAO) = { := }
-            // FIRST(CHAMADAPROC) = { (, î }
-            // FOLLOW(CMD_IDENT_REST) = FOLLOW(COMANDO) = { ;, end }
-            AddEntry(NT_CMD_IDENT_REST, T_ASSIGN, T_ASSIGN, NT_EXPRESSAO);
-            AddEntry(NT_CMD_IDENT_REST, T_LPAREN, NT_CHAMADAPROC); // Chamada com parâmetros
-            // Se î em FIRST(CHAMADAPROC), usar FOLLOW(CMD_IDENT_REST)
-            AddEntry(NT_CMD_IDENT_REST, T_SEMICOLON, NT_CHAMADAPROC); // Chamada sem parâmetros (epsilon)
-            AddEntry(NT_CMD_IDENT_REST, T_END, NT_CHAMADAPROC); // Chamada sem parâmetros (epsilon)
+            // Regra 24: CMD_IDENT_REST -> := EXPRESSAO #ACAO_VERIFICAR_ATRIB | CHAMADAPROC
+            AddEntry(NT_CMD_IDENT_REST, T_ASSIGN, T_ASSIGN, NT_EXPRESSAO, ACAO_VERIFICAR_ATRIB);
+            AddEntry(NT_CMD_IDENT_REST, T_LPAREN, NT_CHAMADAPROC);
+            AddEntry(NT_CMD_IDENT_REST, T_SEMICOLON, NT_CHAMADAPROC);
+            AddEntry(NT_CMD_IDENT_REST, T_END, NT_CHAMADAPROC);
 
             // Regra 25: CHAMADAPROC -> ( PARAMETROSCHAMADA ) | î
-            // FIRST(() = { ( }
-            // FOLLOW(CHAMADAPROC) = FOLLOW(CMD_IDENT_REST) = { ;, end }
             AddEntry(NT_CHAMADAPROC, T_LPAREN, T_LPAREN, NT_PARAMETROSCHAMADA, T_RPAREN);
             AddEntry(NT_CHAMADAPROC, T_SEMICOLON, T_EPSILON);
             AddEntry(NT_CHAMADAPROC, T_END, T_EPSILON);
-
             // Regra 26: PARAMETROSCHAMADA -> EXPRESSAO PARAM_CHAMADA_REST | î
-            // FIRST(EXPRESSAO) = { ident, nint, nreal, literal, ( }
-            // FOLLOW(PARAMETROSCHAMADA) = { ) }
             AddEntry(NT_PARAMETROSCHAMADA, T_IDENT, NT_EXPRESSAO, NT_PARAM_CHAMADA_REST);
             AddEntry(NT_PARAMETROSCHAMADA, T_NINT, NT_EXPRESSAO, NT_PARAM_CHAMADA_REST);
             AddEntry(NT_PARAMETROSCHAMADA, T_NREAL, NT_EXPRESSAO, NT_PARAM_CHAMADA_REST);
@@ -293,29 +277,24 @@ namespace CompiladorParaConsole
             AddEntry(NT_PARAMETROSCHAMADA, T_RPAREN, T_EPSILON);
 
             // Regra 27: PARAM_CHAMADA_REST -> , EXPRESSAO PARAM_CHAMADA_REST | î
-            // FIRST(,) = {,}
-            // FOLLOW(PARAM_CHAMADA_REST) = { ) }
             AddEntry(NT_PARAM_CHAMADA_REST, T_COMMA, T_COMMA, NT_EXPRESSAO, NT_PARAM_CHAMADA_REST);
             AddEntry(NT_PARAM_CHAMADA_REST, T_RPAREN, T_EPSILON);
 
-            // Regra 28: COMANDO -> for ident := EXPRESSAO to EXPRESSAO do BLOCO
-            AddEntry(NT_COMANDO, T_FOR, T_FOR, T_IDENT, T_ASSIGN, NT_EXPRESSAO, T_TO, NT_EXPRESSAO, T_DO, NT_BLOCO);
+            // Regra 28: COMANDO -> for ident := EXPRESSAO to EXPRESSAO do #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO
+            AddEntry(NT_COMANDO, T_FOR, T_FOR, T_IDENT, T_ASSIGN, NT_EXPRESSAO, T_TO, NT_EXPRESSAO, T_DO, ACAO_INICIAR_ESCOPO, NT_BLOCO, ACAO_FINALIZAR_ESCOPO);
 
-            // Regra 29: COMANDO -> while ( EXPRELACIONAL ) do BLOCO
-            AddEntry(NT_COMANDO, T_WHILE, T_WHILE, T_LPAREN, NT_EXPRELACIONAL, T_RPAREN, T_DO, NT_BLOCO);
+            // Regra 29: COMANDO -> while ( EXPRELACIONAL ) do #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO
+            AddEntry(NT_COMANDO, T_WHILE, T_WHILE, T_LPAREN, NT_EXPRELACIONAL, T_RPAREN, T_DO, ACAO_INICIAR_ESCOPO, NT_BLOCO, ACAO_FINALIZAR_ESCOPO);
 
             // Regra 30: COMANDO -> read ( ident )
             AddEntry(NT_COMANDO, T_READ, T_READ, T_LPAREN, T_IDENT, T_RPAREN);
 
-            // Regra 31: ELSEOPC -> else BLOCO | î
-            // FIRST(else) = {else}
-            // FOLLOW(ELSEOPC) = FOLLOW(COMANDO) = { ;, end }
-            AddEntry(NT_ELSEOPC, T_ELSE, T_ELSE, NT_BLOCO);
+            // Regra 31: ELSEOPC -> else #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO | î
+            AddEntry(NT_ELSEOPC, T_ELSE, T_ELSE, ACAO_INICIAR_ESCOPO, NT_BLOCO, ACAO_FINALIZAR_ESCOPO);
             AddEntry(NT_ELSEOPC, T_SEMICOLON, T_EPSILON);
             AddEntry(NT_ELSEOPC, T_END, T_EPSILON);
 
             // Regra 32: ITEMSAIDA -> EXPRESSAO
-            // FIRST(EXPRESSAO) = { ident, nint, nreal, literal, ( }
             AddEntry(NT_ITEMSAIDA, T_IDENT, NT_EXPRESSAO);
             AddEntry(NT_ITEMSAIDA, T_NINT, NT_EXPRESSAO);
             AddEntry(NT_ITEMSAIDA, T_NREAL, NT_EXPRESSAO);
@@ -323,13 +302,10 @@ namespace CompiladorParaConsole
             AddEntry(NT_ITEMSAIDA, T_LPAREN, NT_EXPRESSAO);
 
             // Regra 33: REPITEM -> , ITEMSAIDA REPITEM | î
-            // FIRST(,) = {,}
-            // FOLLOW(REPITEM) = { } }
             AddEntry(NT_REPITEM, T_COMMA, T_COMMA, NT_ITEMSAIDA, NT_REPITEM);
             AddEntry(NT_REPITEM, T_RBRACE, T_EPSILON);
 
             // Regra 34: EXPRELACIONAL -> EXPRESSAO OPREL EXPRESSAO
-            // FIRST(EXPRESSAO) = { ident, nint, nreal, literal, ( }
             AddEntry(NT_EXPRELACIONAL, T_IDENT, NT_EXPRESSAO, NT_OPREL, NT_EXPRESSAO);
             AddEntry(NT_EXPRELACIONAL, T_NINT, NT_EXPRESSAO, NT_OPREL, NT_EXPRESSAO);
             AddEntry(NT_EXPRELACIONAL, T_NREAL, NT_EXPRESSAO, NT_OPREL, NT_EXPRESSAO);
@@ -345,18 +321,15 @@ namespace CompiladorParaConsole
             AddEntry(NT_OPREL, T_GE, T_GE);
 
             // Regra 36: EXPRESSAO -> TERMO EXPR'
-            // FIRST(TERMO) = { ident, nint, nreal, literal, ( }
             AddEntry(NT_EXPRESSAO, T_IDENT, NT_TERMO, NT_EXPR_PRIME);
             AddEntry(NT_EXPRESSAO, T_NINT, NT_TERMO, NT_EXPR_PRIME);
             AddEntry(NT_EXPRESSAO, T_NREAL, NT_TERMO, NT_EXPR_PRIME);
             AddEntry(NT_EXPRESSAO, T_LITERAL, NT_TERMO, NT_EXPR_PRIME);
             AddEntry(NT_EXPRESSAO, T_LPAREN, NT_TERMO, NT_EXPR_PRIME);
 
-            // Regra 37: EXPR' -> + TERMO EXPR' | - TERMO EXPR' | î
-            // FIRST(+) = {+}, FIRST(-) = {-}
-            // FOLLOW(EXPR') = { =, <>, <, >, <=, >=, to, do, ;, ,, ), } }
-            AddEntry(NT_EXPR_PRIME, T_PLUS, T_PLUS, NT_TERMO, NT_EXPR_PRIME);
-            AddEntry(NT_EXPR_PRIME, T_MINUS, T_MINUS, NT_TERMO, NT_EXPR_PRIME);
+            // Regra 37: EXPR' -> + TERMO #ACAO_CHECAR_OP_ARIT EXPR' | - TERMO #ACAO_CHECAR_OP_ARIT EXPR' | î
+            AddEntry(NT_EXPR_PRIME, T_PLUS, T_PLUS, NT_TERMO, ACAO_CHECAR_OP_ARIT, NT_EXPR_PRIME);
+            AddEntry(NT_EXPR_PRIME, T_MINUS, T_MINUS, NT_TERMO, ACAO_CHECAR_OP_ARIT, NT_EXPR_PRIME);
             AddEntry(NT_EXPR_PRIME, T_EQ, T_EPSILON);
             AddEntry(NT_EXPR_PRIME, T_NE, T_EPSILON);
             AddEntry(NT_EXPR_PRIME, T_LT, T_EPSILON);
@@ -369,23 +342,19 @@ namespace CompiladorParaConsole
             AddEntry(NT_EXPR_PRIME, T_COMMA, T_EPSILON);
             AddEntry(NT_EXPR_PRIME, T_RPAREN, T_EPSILON);
             AddEntry(NT_EXPR_PRIME, T_RBRACE, T_EPSILON);
-            AddEntry(NT_EXPR_PRIME, T_THEN, T_EPSILON); // Added based on EXPRELACIONAL context
-            AddEntry(NT_EXPR_PRIME, T_END, T_EPSILON); // Added based on context
+            AddEntry(NT_EXPR_PRIME, T_THEN, T_EPSILON);
+            AddEntry(NT_EXPR_PRIME, T_END, T_EPSILON);
 
             // Regra 38: TERMO -> FATOR TER'
-            // FIRST(FATOR) = { ident, nint, nreal, literal, ( }
             AddEntry(NT_TERMO, T_IDENT, NT_FATOR, NT_TER_PRIME);
             AddEntry(NT_TERMO, T_NINT, NT_FATOR, NT_TER_PRIME);
             AddEntry(NT_TERMO, T_NREAL, NT_FATOR, NT_TER_PRIME);
             AddEntry(NT_TERMO, T_LITERAL, NT_FATOR, NT_TER_PRIME);
             AddEntry(NT_TERMO, T_LPAREN, NT_FATOR, NT_TER_PRIME);
 
-            // Regra 39: TER' -> * FATOR TER' | / FATOR TER' | î
-            // FIRST(*) = {*}, FIRST(/) = {/}
-            // FOLLOW(TER') = FOLLOW(TERMO) = { +, -, =, <>, <, >, <=, >=, to, do, ;, ,, ), } }
-            AddEntry(NT_TER_PRIME, T_MULT, T_MULT, NT_FATOR, NT_TER_PRIME);
-            AddEntry(NT_TER_PRIME, T_DIV, T_DIV, NT_FATOR, NT_TER_PRIME);
-            // Epsilon entries based on FOLLOW(TER')
+            // Regra 39: TER' -> * FATOR #ACAO_CHECAR_OP_ARIT TER' | / FATOR #ACAO_CHECAR_OP_ARIT TER' | î
+            AddEntry(NT_TER_PRIME, T_MULT, T_MULT, NT_FATOR, ACAO_CHECAR_OP_ARIT, NT_TER_PRIME);
+            AddEntry(NT_TER_PRIME, T_DIV, T_DIV, NT_FATOR, ACAO_CHECAR_OP_ARIT, NT_TER_PRIME);
             AddEntry(NT_TER_PRIME, T_PLUS, T_EPSILON);
             AddEntry(NT_TER_PRIME, T_MINUS, T_EPSILON);
             AddEntry(NT_TER_PRIME, T_EQ, T_EPSILON);
@@ -400,35 +369,37 @@ namespace CompiladorParaConsole
             AddEntry(NT_TER_PRIME, T_COMMA, T_EPSILON);
             AddEntry(NT_TER_PRIME, T_RPAREN, T_EPSILON);
             AddEntry(NT_TER_PRIME, T_RBRACE, T_EPSILON);
-            AddEntry(NT_TER_PRIME, T_THEN, T_EPSILON); // Added based on EXPRELACIONAL context
-            AddEntry(NT_TER_PRIME, T_END, T_EPSILON); // Added based on context
+            AddEntry(NT_TER_PRIME, T_THEN, T_EPSILON);
+            AddEntry(NT_TER_PRIME, T_END, T_EPSILON);
 
-            // Regra 40: FATOR -> ident | nint | nreal | literal | ( EXPRESSAO )
-            AddEntry(NT_FATOR, T_IDENT, T_IDENT);
-            AddEntry(NT_FATOR, T_NINT, T_NINT);
-            AddEntry(NT_FATOR, T_NREAL, T_NREAL);
-            AddEntry(NT_FATOR, T_LITERAL, T_LITERAL);
-            AddEntry(NT_FATOR, T_LPAREN, T_LPAREN, NT_EXPRESSAO, T_RPAREN);
-        }
+            // Regra 40: FATOR -> ident #ACAO_VERIFICAR_DECL | nint #ACAO_EMPILHAR_TIPO | nreal #ACAO_EMPILHAR_TIPO | literal #ACAO_EMPILHAR_TIPO | ( EXPRESSAO )
+            AddEntry(NT_FATOR, T_IDENT, T_IDENT, ACAO_VERIFICAR_DECL);
+            AddEntry(NT_FATOR, T_NINT, T_NINT, ACAO_EMPILHAR_TIPO);
+            AddEntry(NT_FATOR, T_NREAL, T_NREAL, ACAO_EMPILHAR_TIPO);
+            AddEntry(NT_FATOR, T_LITERAL, T_LITERAL, ACAO_EMPILHAR_TIPO);
+            AddEntry(NT_FATOR, T_LPAREN, T_LPAREN, NT_EXPRESSAO, T_RPAREN);        }
 
         public bool Analisar(List<TokenInfo> tokensEntrada)
         {
             this.tokens = tokensEntrada;
-            // Adiciona marcador de fim de entrada ($) se não existir
+
             if (!this.tokens.Any() || this.tokens.Last().Lexema != T_EOF)
             {
                 this.tokens.Add(new TokenInfo(0, T_EOF, tokens.LastOrDefault()?.Linha ?? 1));
             }
 
-            this.tokenIndex = 0;
-            this.errosSintaticos.Clear();
+            tokenIndex = 0;
+            errosSintaticos.Clear();
+            analisadorSemantico.ErrosSemanticos.Clear();
+            identificadoresParaDeclarar.Clear();
+            parametrosParaDeclarar.Clear();
 
             pilha.Clear();
             pilha.Push(T_EOF); // Marcador de fundo da pilha
             pilha.Push(NT_PROGRAMA); // Símbolo inicial da gramática
 
             Console.WriteLine("\n--- Análise Sintática ---");
-            MostrarPilha("Inicial");
+            analisadorSemantico.Tabela.ImprimirTabela("Inicial");
 
             do
             {
@@ -436,23 +407,28 @@ namespace CompiladorParaConsole
                 TokenInfo tokenAtual = tokenIndex < tokens.Count ? tokens[tokenIndex] : new TokenInfo(0, "$", tokens.LastOrDefault()?.Linha ?? 1);
                 string terminalAtual = MapearTokenParaTerminal(tokenAtual);
 
-                Console.WriteLine($"Pilha: [ {string.Join(", ", pilha.Reverse())} ] | Token Atual: {terminalAtual} (	'{tokenAtual.Lexema}		' Linha: {tokenAtual.Linha})");
+                Console.WriteLine($"Pilha: [ {string.Join(", ", pilha.Reverse())} ] | Token Atual: {terminalAtual} (	'{tokenAtual.Codigo}		' Linha: {tokenAtual.Linha})");
+
+                if (topo.StartsWith("#ACAO"))
+                {
+                    pilha.Pop();
+                    ExecutarAcaoSemantica(topo);
+                    continue;
+                }
 
                 if (terminais.Contains(topo))
                 {
                     if (topo == terminalAtual)
                     {
                         pilha.Pop();
+                        tokenLidoAnteriormente = tokenAtual;
                         tokenIndex++;
-                        // MostrarPilha("Match"); // Muita verbosidade
                     }
                     else
                     {
                         RegistrarErroMatch(topo, tokenAtual);
-                        // Recuperação de erro (Pânico): Avança token até encontrar algo esperado ou sincronizador
-                        // Tentativa simples: avançar token
                         tokenIndex++;
-                        if (terminalAtual == T_EOF) break; // Evita loop infinito no fim
+                        if (terminalAtual == T_EOF) break;
                     }
                 }
                 else if (naoTerminais.Contains(topo))
@@ -461,66 +437,124 @@ namespace CompiladorParaConsole
                     {
                         pilha.Pop();
                         string[] producao = tabelaParsing[(topo, terminalAtual)];
-                        // Empilha a produção em ordem reversa
                         for (int i = producao.Length - 1; i >= 0; i--)
                         {
-                            if (producao[i] != T_EPSILON) // î representa vazio (epsilon)
+                            if (producao[i] != T_EPSILON)
                             {
                                 pilha.Push(producao[i]);
                             }
                         }
-                        //MostrarPilha("Produção"); // Muita verbosidade
                     }
                     else
                     {
                         RegistrarErroParsing(topo, tokenAtual);
-                        // Recuperação de erro (Pânico):
-                        // Opção 1: Descartar token atual
-                        tokenIndex++;
+                        tokenIndex++; 
                         Console.WriteLine($"[RECUPERAÇÃO] Descartando token 	'{terminalAtual}	' e continuando.");
-                        if (terminalAtual == T_EOF) break; // Evita loop infinito no fim
-
-                        // Opção 2: Desempilhar não-terminal (pode ser perigoso)
-                        // pilha.Pop();
-                        // Console.WriteLine($"[RECUPERAÇÃO] Desempilhando 	'{topo}	' e continuando.");
+                        if (terminalAtual == T_EOF) break;
                     }
                 }
                 else
                 {
-                    // Símbolo inesperado na pilha (erro interno)
                     Console.WriteLine($"[ERRO INTERNO] Símbolo inesperado na pilha: {topo}");
                     errosSintaticos.Add($"Erro interno: Símbolo inesperado na pilha 	'{topo}	'");
-                    return false; // Aborta análise
+                    return false;
                 }
 
             } while (pilha.Peek() != T_EOF);
 
-            if (tokenIndex < tokens.Count && tokens[tokenIndex].Lexema == T_EOF)
+            bool sucessoSintatico = errosSintaticos.Count == 0;
+            bool sucessoSemantico = analisadorSemantico.ErrosSemanticos.Count == 0;
+
+            if (sucessoSintatico && sucessoSemantico)
             {
-                if (errosSintaticos.Count == 0)
-                {
-                    Console.WriteLine("\nAnálise Sintática concluída com sucesso!");
-                    return true;
-                }
-                else
-                {
-                    Console.WriteLine("\nAnálise Sintática concluída com erros.");
-                    MostrarErros();
-                    return false;
-                }
+                Console.WriteLine("\nAnálise Sintática e Semântica concluída com sucesso!");
+                return true;
             }
             else
             {
-                // A pilha está vazia ($ no topo), mas ainda há tokens na entrada
-                Console.WriteLine("\nAnálise Sintática concluída com erros.");
-
-                if (tokenIndex < tokens.Count)
-                    errosSintaticos.Add($"Erro: Tokens restantes após o fim esperado do programa na linha {tokens[tokenIndex].Linha}. Token inesperado: '{tokens[tokenIndex].Lexema}'");
-                else
-                    errosSintaticos.Add("Erro: Tokens restantes após o fim esperado do programa, mas não foi possível identificar o token pois o índice excedeu o tamanho da lista.");
-
+                Console.WriteLine("\nAnálise concluída com erros.");
                 MostrarErros();
                 return false;
+            }
+        }
+
+        private void ExecutarAcaoSemantica(string acao)
+        {
+            switch (acao)
+            {
+                case ACAO_GUARDAR_IDENT_PARA_CONST:
+                    identificadorConstante = tokenLidoAnteriormente;
+                    break;
+
+                case ACAO_INSERIR_CONST:
+                    analisadorSemantico.Acao_InserirConstante(identificadorConstante, tokenLidoAnteriormente);
+                    break;
+
+                case ACAO_GUARDAR_IDENT_PARA_DECL:
+                    identificadoresParaDeclarar.Add(tokenLidoAnteriormente);
+                    break;
+
+                case ACAO_INSERIR_VAR_LISTA:
+                    foreach (var idToken in identificadoresParaDeclarar)
+                    {
+                        analisadorSemantico.Acao_InserirVariavel(idToken, tipoAtual);
+                    }
+                    identificadoresParaDeclarar.Clear();
+                    break;
+
+                case ACAO_GUARDAR_IDENT_PARA_PROC:
+                    identificadorProcedure = tokenLidoAnteriormente;
+                    break;
+
+                case ACAO_INSERIR_PROC:
+                    analisadorSemantico.Acao_InserirProcedure(identificadorProcedure);
+                    break;
+
+                case ACAO_GUARDAR_IDENT_PARA_PARAM:
+                    parametrosParaDeclarar.Add(tokenLidoAnteriormente);
+                    break;
+
+                case ACAO_INSERIR_PARAM_LISTA:
+                    foreach (var paramToken in parametrosParaDeclarar)
+                    {
+                        analisadorSemantico.Acao_InserirVariavel(paramToken, tipoAtual);
+                    }
+                    parametrosParaDeclarar.Clear();
+                    break;
+
+                case ACAO_GUARDAR_TIPO:
+                    tipoAtual = tokenLidoAnteriormente.Lexema;
+                    break;
+
+                case ACAO_GUARDAR_IDENT_PARA_USO:
+                    identificadoresParaDeclarar.Add(tokenLidoAnteriormente);
+                    break;
+
+                case ACAO_VERIFICAR_DECL:
+                    analisadorSemantico.Acao_VerificarDeclaracao(tokenLidoAnteriormente);
+                    break;
+
+                case ACAO_VERIFICAR_ATRIB:
+                    var variavelAtribuicao = identificadoresParaDeclarar.Last();
+                    analisadorSemantico.Acao_VerificarAtribuicao(variavelAtribuicao);
+                    identificadoresParaDeclarar.Remove(variavelAtribuicao);
+                    break;
+
+                case ACAO_EMPILHAR_TIPO:
+                    analisadorSemantico.Acao_EmpilharTipo(tokenLidoAnteriormente);
+                    break;
+
+                case ACAO_CHECAR_OP_ARIT:
+                    analisadorSemantico.Acao_ChecarTipoOperacaoAritmetica();
+                    break;
+
+                case ACAO_INICIAR_ESCOPO:
+                    analisadorSemantico.Tabela.IniciarEscopo();
+                    break;
+
+                case ACAO_FINALIZAR_ESCOPO:
+                    analisadorSemantico.Tabela.FinalizarEscopo();
+                    break;
             }
         }
 
@@ -533,23 +567,10 @@ namespace CompiladorParaConsole
             if (token.Codigo == 11) return T_NREAL; // nreal
             if (token.Codigo == 13) return T_LITERAL; // literal (string)
             // Para palavras reservadas e símbolos, o lexema geralmente corresponde ao terminal
-            if (terminais.Contains(token.Lexema))
-            {
-                return token.Lexema;
-            }
+            if (terminais.Contains(token.Lexema)) return token.Lexema;
 
-            // Se não for nenhum dos anteriores, pode ser um erro léxico já tratado
-            // ou um token inesperado para o sintático.
-            // Retornar o próprio lexema pode causar falha na busca da tabela,
-            // o que é tratado como erro sintático.
             Console.WriteLine($"[AVISO] Mapeamento: Token 	'{token.Lexema}	' (Código: {token.Codigo}) não é um terminal esperado diretamente. Usando lexema.");
             return token.Lexema;
-        }
-
-        private void MostrarPilha(string acao)
-        {
-            // Limitando a verbosidade, descomente se precisar depurar passo a passo
-            // Console.WriteLine($"Pilha ({acao}): [ {string.Join(", ", pilha.Reverse())} ]");
         }
 
         private void RegistrarErroMatch(string esperado, TokenInfo recebido)
@@ -562,7 +583,6 @@ namespace CompiladorParaConsole
         private void RegistrarErroParsing(string naoTerminal, TokenInfo recebido)
         {
             string msg = $"Erro Sintático: Não foi possível aplicar regra para 	'{naoTerminal}	' com o token 	'{recebido.Lexema}	' na linha {recebido.Linha}. Token inesperado.";
-            // Poderia listar os terminais esperados consultando a tabela para `naoTerminal`
             Console.WriteLine($"[ERRO] {msg}");
             if (!errosSintaticos.Contains(msg)) errosSintaticos.Add(msg);
         }
@@ -572,7 +592,16 @@ namespace CompiladorParaConsole
             if (errosSintaticos.Any())
             {
                 Console.WriteLine("\n--- Erros Sintáticos Detectados ---");
-                foreach (var erro in errosSintaticos)
+                foreach (var erro in errosSintaticos.Distinct())
+                {
+                    Console.WriteLine(erro);
+                }
+            }
+
+            if (analisadorSemantico.ErrosSemanticos.Any())
+            {
+                Console.WriteLine("\n--- Erros Semânticos Detectados ---");
+                foreach (var erro in analisadorSemantico.ErrosSemanticos.Distinct())
                 {
                     Console.WriteLine(erro);
                 }

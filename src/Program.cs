@@ -12,7 +12,7 @@ class Program
         Console.WriteLine("3: exemplo3.txt (For, Expressões)");
         Console.Write("Digite o número da opção: ");
 
-        string escolha = Console.ReadLine();
+        string escolha = Console.ReadLine() ?? "";
 
         switch (escolha)
         {
@@ -43,7 +43,6 @@ class Program
         string codigo = File.ReadAllText(caminhoArquivo);
         Console.WriteLine($"\nConteudo de arquivo: \n {codigo} \n");
 
-        // --- Análise Léxica ---
         Console.WriteLine("\n--- Análise Léxica ---");
         var tokens = AnalisadorLexico.Analisar(codigo);
 
@@ -68,15 +67,8 @@ class Program
         {
             Console.WriteLine("\nNenhum erro léxico encontrado.");
 
-            // --- Análise Sintática ---
             AnalisadorSintatico analisadorSintatico = new AnalisadorSintatico();
             bool sucessoSintatico = analisadorSintatico.Analisar(tokens);
-
-            if (!sucessoSintatico)
-            {
-                // Erros já são mostrados dentro do método Analisar/MostrarErros
-                // Console.WriteLine("\nAnálise sintática falhou.");
-            }
         }
 
         Console.WriteLine("\nAnálise concluída. Pressione Enter para sair.");
