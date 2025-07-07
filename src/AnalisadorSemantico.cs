@@ -209,7 +209,7 @@ namespace CompiladorParaConsole
         public int Nivel { get; set; }
         public object? Valor { get; set; }
 
-        public Simbolo(string lexema, CategoriaSimbolo categoria, string tipo, int nivel, object valor = null)
+        public Simbolo(string lexema, CategoriaSimbolo categoria, string tipo, int nivel, object? valor = null)
         {
             Lexema = lexema;
             Categoria = categoria;

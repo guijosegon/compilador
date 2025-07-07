@@ -121,6 +121,9 @@ namespace CompiladorParaConsole
             pilha = new Stack<string>();
             errosSintaticos = new List<string>();
             analisadorSemantico = new AnalisadorSemantico();
+            identificadoresParaDeclarar = new List<TokenInfo>();
+            parametrosParaDeclarar = new List<TokenInfo>();
+
             InicializarConjuntos();
             InicializarTabelaParsing();
         }
