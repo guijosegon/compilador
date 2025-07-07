@@ -137,7 +137,7 @@ namespace CompiladorParaConsole
                             }
                             else if (c == '"')
                             {
-                                break; // fim da string
+                                break;
                             }
                             fimString++;
                         }
@@ -198,7 +198,6 @@ namespace CompiladorParaConsole
                         continue;
                     }
 
-                    // Se chegou aqui, é lexema inválido
                     string resto = linha.Substring(coluna).Split(' ').FirstOrDefault() ?? linha[coluna].ToString();
                     Erros.Add($"[ERRO] Lexema inválido: '{resto}' na linha {i + 1}");
                     coluna += resto.Length;

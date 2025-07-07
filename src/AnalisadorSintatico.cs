@@ -9,12 +9,12 @@ namespace CompiladorParaConsole
         private List<string> errosSintaticos;
 
         private AnalisadorSemantico analisadorSemantico;
-        private TokenInfo tokenLidoAnteriormente; // Guarda o último token terminal lido (ident, nint, etc.)
-        private string tipoAtual; // Guarda o tipo lido em uma declaração (integer, real, etc.)
-        private List<TokenInfo> identificadoresParaDeclarar = new List<TokenInfo>(); // Lista para declarações (ex: var x, y: integer)
-        private TokenInfo identificadorConstante; // Armazena o ident de uma constante sendo declarada
-        private TokenInfo identificadorProcedure; // Armazena o ident de uma procedure sendo declarada
-        private List<TokenInfo> parametrosParaDeclarar = new List<TokenInfo>(); // Lista para parâmetros de procedure
+        private TokenInfo tokenLidoAnteriormente;
+        private string tipoAtual;
+        private List<TokenInfo> identificadoresParaDeclarar = new List<TokenInfo>();
+        private TokenInfo identificadorConstante;
+        private TokenInfo identificadorProcedure;
+        private List<TokenInfo> parametrosParaDeclarar = new List<TokenInfo>();
 
         private const string ACAO_INSERIR_CONST = "#ACAO_INSERIR_CONST";
         private const string ACAO_INSERIR_VAR_LISTA = "#ACAO_INSERIR_VAR_LISTA";

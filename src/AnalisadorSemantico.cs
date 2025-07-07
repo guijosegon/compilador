@@ -205,9 +205,9 @@ namespace CompiladorParaConsole
     {
         public string Lexema { get; set; }
         public CategoriaSimbolo Categoria { get; set; }
-        public string Tipo { get; set; } // "integer", "real", "string", ou "procedure"
-        public int Nivel { get; set; } // Nível de escopo (0 para global)
-        public object? Valor { get; set; } // Para constantes
+        public string Tipo { get; set; }
+        public int Nivel { get; set; }
+        public object? Valor { get; set; }
 
         public Simbolo(string lexema, CategoriaSimbolo categoria, string tipo, int nivel, object valor = null)
         {

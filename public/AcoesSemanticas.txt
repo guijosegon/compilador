@@ -1,0 +1,282 @@
+Relatório do Analisador Semântico e mais alterações
+
+--------------------------------------------------------------------------------------------------------
+
+1. Estrutura e Gerenciamento da Tabela de Símbolos:
+
+A Tabela de Símbolos é o coração do analisador semântico, atuando como um repositório central para todas as 
+informações relevantes sobre os identificadores (variáveis, constantes, procedimentos, parâmetros) encontrados no código-fonte.
+
+Estrutura de Dados: A implementação utiliza uma Stack<Simbolo> (Pilha de Símbolos) para armazenar as entradas. 
+Esta escolha é estratégica para o gerenciamento de escopos, pois a natureza LIFO (Last-In, First-Out) da pilha permite que os 
+símbolos de escopos mais internos sejam facilmente acessados e, posteriormente, removidos quando o escopo é finalizado.
+
+Classe Simbolo: Cada entrada na Tabela de Símbolos é representada por um objeto da classe Simbolo. 
+Ela encapsula as seguintes informações sobre um identificador:
+Lexema (string): O nome do identificador (ex: contador, MAX_VALOR, verificarPar).
+Categoria (enum CategoriaSimbolo): Classifica o identificador como VARIAVEL, CONSTANTE ou PROCEDIMENTO.
+Tipo (string): O tipo de dado associado (integer, real, string) ou procedure para procedimentos.
+Nivel (int): O nível de aninhamento do escopo onde o símbolo foi declarado. O escopo global é o Nível 0. Cada novo escopo (como o de uma procedure ou um bloco if/while/for) incrementa este nível.
+Valor (object): Utilizado para armazenar o valor de constantes.
+
+Operações da TabelaDeSimbolos:
+IniciarEscopo(): Incrementa o _nivelAtual da tabela, sinalizando a entrada em um novo escopo.
+FinalizarEscopo(): Decrementa o _nivelAtual e remove da pilha todos os Simbolos cujo Nivel corresponde ao nível que está sendo encerrado. Isso garante que identificadores locais não sejam acessíveis fora de seu escopo.
+Inserir(Simbolo simbolo): Adiciona um novo Simbolo à pilha. Antes da inserção, verifica se já existe um símbolo com o mesmo Lexema e Nivel (ou seja, no mesmo escopo). Se uma duplicidade for detectada, a inserção é recusada e um erro semântico é sinalizado.
+Buscar(string lexema): Procura um Simbolo na pilha, começando do topo (escopo mais interno) em direção à base (escopo global). A primeira ocorrência encontrada é retornada, respeitando as regras de visibilidade e sombreamento de identificadores.
+ImprimirTabela(string momento): Para fins de depuração e demonstração, este método imprime o conteúdo atual da tabela de símbolos no console a cada modificação (inserção ou finalização de escopo), fornecendo um trace visual do estado da tabela.
+
+----------------------------------------------------------------------------------------------------------
+
+2. Ações Semânticas Implementadas:
+
+As ações semânticas são rotinas executadas pelo analisador sintático em pontos específicos da gramática, 
+representadas por marcadores (#ACAO_...). Elas são responsáveis por verificar a consistência do código e popular/consultar a Tabela de Símbolos.
+
+Foram implementadas as seguintes ações semânticas:
+
+ACAO_INSERIR_CONST (Ação Semântica: Inserir Constante)
+Funcionamento: Registra uma constante na Tabela de Símbolos. Ela recebe o identificador da constante e o token do seu valor.
+Verificações: Garante que a constante não foi previamente declarada no mesmo escopo.
+Chamada em: DEF_CONST_LIST e MORE_CONST.
+Exemplo de Gramática: DEF_CONST_LIST -> ident #ACAO_GUARDAR_IDENT_PARA_CONST = nint #ACAO_INSERIR_CONST ; MORE_CONST
+
+ACAO_INSERIR_VAR_LISTA (Ação Semântica: Inserir Variáveis da Lista)
+Funcionamento: Insere um ou mais identificadores (variáveis) na Tabela de Símbolos com o tipo de dado e o nível de escopo corretos. Esta ação é acionada após a leitura completa de uma lista de variáveis e seu tipo.
+Verificações: Impede a declaração duplicada de variáveis no mesmo escopo.
+Chamada em: DEF_VAR_LIST.
+Exemplo de Gramática: DEF_VAR_LIST -> LISTAVARIAVEIS : TIPO ; #ACAO_INSERIR_VAR_LISTA
+
+ACAO_INSERIR_PROC (Ação Semântica: Inserir Procedure)
+Funcionamento: Registra o nome de uma procedure na Tabela de Símbolos.
+Verificações: Verifica se o nome da procedure já está em uso no escopo atual.
+Chamada em: PROC_LIST e PROC_LIST_TAIL.
+Exemplo de Gramática: PROC_LIST -> procedure ident #ACAO_GUARDAR_IDENT_PARA_PROC #ACAO_INSERIR_PROC ...
+
+ACAO_INSERIR_PARAM_LISTA (Ação Semântica: Inserir Parâmetros da Procedure)
+Funcionamento: Insere os parâmetros formais de uma procedure na Tabela de Símbolos, no escopo recém-criado da procedure.
+Verificações: Garante que os parâmetros não foram declarados duplicadamente dentro da lista de parâmetros.
+Chamada em: PROC_LIST e PROC_LIST_TAIL (após a leitura dos parâmetros e o início do escopo da procedure).
+Exemplo de Gramática: ... PARÂMETROS #ACAO_INSERIR_PARAM_LISTA ; BLOCO ...
+
+ACAO_VERIFICAR_DECL (Ação Semântica: Verificar Declaração)
+Funcionamento: Confere se um identificador que está sendo utilizado (em uma expressão, atribuição, etc.) foi previamente declarado em algum escopo visível.
+Verificações: Se o identificador não for encontrado, um erro de "não declarado" é gerado. Se encontrado, seu tipo é empilhado para futuras verificações de compatibilidade.
+Chamada em: FATOR (para identificadores em expressões), ITEMSAIDA.
+Exemplo de Gramática: FATOR -> ident #ACAO_VERIFICAR_DECL | ...
+
+ACAO_VERIFICAR_ATRIB (Ação Semântica: Verificar Atribuição)
+Funcionamento: Valida a compatibilidade de tipos em comandos de atribuição (:=).
+Verificações:
+Verifica se a variável do lado esquerdo foi declarada.
+Impede a atribuição de valores a constantes.
+Compara o tipo da variável (obtido da Tabela de Símbolos) com o tipo da expressão do lado direito (obtido da pilha de tipos). Permite atribuição de integer para real, mas não o contrário ou outras incompatibilidades.
+Chamada em: CMD_IDENT_REST.
+Exemplo de Gramática: CMD_IDENT_REST -> := EXPRESSAO #ACAO_VERIFICAR_ATRIB | ...
+
+ACAO_EMPILHAR_TIPO (Ação Semântica: Empilhar Tipo de Literal)
+Funcionamento: Determina o tipo de um literal numérico (nint, nreal) ou de string (literal) e o empilha em uma pilha auxiliar de tipos. Esta pilha é usada para rastrear os tipos das subexpressões durante a avaliação de expressões.
+Chamada em: FATOR.
+Exemplo de Gramática: FATOR -> ... | nint #ACAO_EMPILHAR_TIPO | nreal #ACAO_EMPILHAR_TIPO | literal #ACAO_EMPILHAR_TIPO | ...
+
+ACAO_CHECAR_OP_ARIT (Ação Semântica: Checar Operação Aritmética)
+Funcionamento: Verifica a validade e determina o tipo resultante de operações aritméticas (+, -, *, /).
+Verificações: Desempilha os tipos dos dois operandos. Se algum for string ou indefinido, um erro é gerado. Caso contrário, o tipo resultante é real se qualquer operando for real, ou integer se ambos forem integer. O tipo resultante é então empilhado.
+Chamada em: EXPR' e TER'.
+Exemplo de Gramática: EXPR' -> + TERMO #ACAO_CHECAR_OP_ARIT EXPR' | ...
+
+ACAO_INICIAR_ESCOPO e ACAO_FINALIZAR_ESCOPO (Ações Semânticas: Gerenciamento de Escopo)
+Funcionamento: ACAO_INICIAR_ESCOPO incrementa o nível de escopo na Tabela de Símbolos, preparando-a para novas declarações locais. ACAO_FINALIZAR_ESCOPO decrementa o nível e remove todos os símbolos pertencentes ao escopo que está sendo encerrado.
+Chamada em: Início de blocos de procedures (PROC_LIST, PROC_LIST_TAIL), e blocos de comandos que criam escopo (if, while, for, else).
+Exemplo de Gramática: PROC_LIST -> ... #ACAO_INICIAR_ESCOPO PARÂMETROS ... BLOCO #ACAO_FINALIZAR_ESCOPO ...
+
+------------------------------------------------------------------------------------------------------------
+
+3. Gramática da Linguagem com Ações Semânticas:
+
+As ações semânticas (prefixadas com #ACAO_) são inseridas diretamente nas produções da gramática. 
+Elas são executadas no momento em que o analisador sintático reconhece a parte da produção onde a ação está inserida.
+
+// Regras da Gramática com Ações Semânticas (trechos relevantes)
+
+// Regra 1: PROGRAMA -> program ident ; DECLARACOES BLOCO .
+// O bloco principal do programa é o escopo global (Nível 0), não precisa de Iniciar/FinalizarEscopo aqui.
+PROGRAMA -> program ident ; DECLARACOES BLOCO .
+
+// Regra 4: DEF_CONST_LIST -> ident #ACAO_GUARDAR_IDENT_PARA_CONST = nint #ACAO_INSERIR_CONST ; MORE_CONST
+DEF_CONST_LIST -> ident #ACAO_GUARDAR_IDENT_PARA_CONST = nint #ACAO_INSERIR_CONST ; MORE_CONST
+
+// Regra 5: MORE_CONST -> ident #ACAO_GUARDAR_IDENT_PARA_CONST = nint #ACAO_INSERIR_CONST ; MORE_CONST | î
+MORE_CONST -> ident #ACAO_GUARDAR_IDENT_PARA_CONST = nint #ACAO_INSERIR_CONST ; MORE_CONST
+MORE_CONST -> î
+
+// Regra 7: DEF_VAR_LIST -> LISTAVARIAVEIS : TIPO ; #ACAO_INSERIR_VAR_LISTA
+DEF_VAR_LIST -> LISTAVARIAVEIS : TIPO ; #ACAO_INSERIR_VAR_LISTA
+
+// Regra 9: LISTAVARIAVEIS -> ident #ACAO_GUARDAR_IDENT_PARA_DECL LIDENT
+LISTAVARIAVEIS -> ident #ACAO_GUARDAR_IDENT_PARA_DECL LIDENT
+
+// Regra 10: LIDENT -> , ident #ACAO_GUARDAR_IDENT_PARA_DECL LIDENT | î
+LIDENT -> , ident #ACAO_GUARDAR_IDENT_PARA_DECL LIDENT
+LIDENT -> î
+
+// Regra 11: TIPO -> (integer | real | string) #ACAO_GUARDAR_TIPO
+TIPO -> integer #ACAO_GUARDAR_TIPO
+TIPO -> real #ACAO_GUARDAR_TIPO
+TIPO -> string #ACAO_GUARDAR_TIPO
+
+// Regra 13: PROC_LIST -> procedure ident #ACAO_GUARDAR_IDENT_PARA_PROC #ACAO_INSERIR_PROC #ACAO_INICIAR_ESCOPO PARÂMETROS #ACAO_INSERIR_PARAM_LISTA ; BLOCO #ACAO_FINALIZAR_ESCOPO ; PROC_LIST_TAIL
+PROC_LIST -> procedure ident #ACAO_GUARDAR_IDENT_PARA_PROC #ACAO_INSERIR_PROC #ACAO_INICIAR_ESCOPO PARÂMETROS #ACAO_INSERIR_PARAM_LISTA ; BLOCO #ACAO_FINALIZAR_ESCOPO ; PROC_LIST_TAIL
+
+// Regra 14: PROC_LIST_TAIL -> procedure ident #ACAO_GUARDAR_IDENT_PARA_PROC #ACAO_INSERIR_PROC #ACAO_INICIAR_ESCOPO PARÂMETROS #ACAO_INSERIR_PARAM_LISTA ; BLOCO #ACAO_FINALIZAR_ESCOPO ; PROC_LIST_TAIL | î
+PROC_LIST_TAIL -> procedure ident #ACAO_GUARDAR_IDENT_PARA_PROC #ACAO_INSERIR_PROC #ACAO_INICIAR_ESCOPO PARÂMETROS #ACAO_INSERIR_PARAM_LISTA ; BLOCO #ACAO_FINALIZAR_ESCOPO ; PROC_LIST_TAIL
+PROC_LIST_TAIL -> î
+
+// Regra 16: LISTAPARAM -> ident #ACAO_GUARDAR_IDENT_PARA_PARAM : TIPO #ACAO_GUARDAR_TIPO PARAM_REST | î
+LISTAPARAM -> ident #ACAO_GUARDAR_IDENT_PARA_PARAM : TIPO #ACAO_GUARDAR_TIPO PARAM_REST
+LISTAPARAM -> î
+
+// Regra 17: PARAM_REST -> , ident #ACAO_GUARDAR_IDENT_PARA_PARAM : TIPO #ACAO_GUARDAR_TIPO PARAM_REST | î
+PARAM_REST -> , ident #ACAO_GUARDAR_IDENT_PARA_PARAM : TIPO #ACAO_GUARDAR_TIPO PARAM_REST
+PARAM_REST -> î
+
+// Regra 18: BLOCO -> VAR_SEC_LOCAL begin COMANDOS end
+// As ações de escopo foram movidas para as regras que chamam BLOCO e criam um novo escopo.
+BLOCO -> VAR_SEC_LOCAL begin COMANDOS end
+
+// Regra 22: COMANDO -> if ( EXPRELACIONAL ) then #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO ELSEOPC
+COMANDO -> if ( EXPRELACIONAL ) then #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO ELSEOPC
+
+// Regra 23: COMANDO -> ident #ACAO_GUARDAR_IDENT_PARA_USO CMD_IDENT_REST
+COMANDO -> ident #ACAO_GUARDAR_IDENT_PARA_USO CMD_IDENT_REST
+
+// Regra 24: CMD_IDENT_REST -> := EXPRESSAO #ACAO_VERIFICAR_ATRIB | CHAMADAPROC
+CMD_IDENT_REST -> := EXPRESSAO #ACAO_VERIFICAR_ATRIB
+CMD_IDENT_REST -> CHAMADAPROC
+
+// Regra 28: COMANDO -> for ident := EXPRESSAO to EXPRESSAO do #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO
+COMANDO -> for ident := EXPRESSAO to EXPRESSAO do #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO
+
+// Regra 29: COMANDO -> while ( EXPRELACIONAL ) do #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO
+COMANDO -> while ( EXPRELACIONAL ) do #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO
+
+// Regra 31: ELSEOPC -> else #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO | î
+ELSEOPC -> else #ACAO_INICIAR_ESCOPO BLOCO #ACAO_FINALIZAR_ESCOPO
+ELSEOPC -> î
+
+// Regra 37: EXPR' -> + TERMO #ACAO_CHECAR_OP_ARIT EXPR' | - TERMO #ACAO_CHECAR_OP_ARIT EXPR' | î
+EXPR' -> + TERMO #ACAO_CHECAR_OP_ARIT EXPR'
+EXPR' -> - TERMO #ACAO_CHECAR_OP_ARIT EXPR'
+EXPR' -> î
+
+// Regra 39: TER' -> * FATOR #ACAO_CHECAR_OP_ARIT TER' | / FATOR #ACAO_CHECAR_OP_ARIT TER' | î
+TER' -> * FATOR #ACAO_CHECAR_OP_ARIT TER'
+TER' -> / FATOR #ACAO_CHECAR_OP_ARIT TER'
+TER' -> î
+
+// Regra 40: FATOR -> ident #ACAO_VERIFICAR_DECL | nint #ACAO_EMPILHAR_TIPO | nreal #ACAO_EMPILHAR_TIPO | literal #ACAO_EMPILHAR_TIPO | ( EXPRESSAO )
+FATOR -> ident #ACAO_VERIFICAR_DECL
+FATOR -> nint #ACAO_EMPILHAR_TIPO
+FATOR -> nreal #ACAO_EMPILHAR_TIPO
+FATOR -> literal #ACAO_EMPILHAR_TIPO
+FATOR -> ( EXPRESSAO )
+
+-------------------------------------------------------------------------------------------------------
+
+4. Listagem de Erros Semânticos Acusados pelo Compilador:
+
+O analisador semântico é capaz de detectar e reportar os seguintes tipos de erros, indicando a linha no código-fonte onde o problema foi encontrado:
+
+Identificador já declarado: Ocorre quando um identificador (variável, constante ou procedure) é declarado mais de uma vez no mesmo escopo.
+Exemplo de Mensagem: Erro Semântico (Linha X): Variável 'nome' já declarada neste escopo.
+Demonstração (exemplo_erro1.txt):
+
+program teste_erros1;
+var
+  valor: integer;
+  valor: real; // ERRO: 'valor' já foi declarado
+begin
+  valor := 10;
+  resultado := valor * 2;
+end.
+
+Saída do Compilador:
+
+--- Erros Semânticos Detectados ---
+Erro Semântico (Linha 5): Variável 'valor' já declarada neste escopo.
+Erro Semântico (Linha 8): Identificador 'resultado' não foi declarado.
+Erro Semântico (Linha 0): Operação aritmética inválida entre os tipos 'integer' e 'indefinido'.
+Erro Semântico (Linha 8): Tipos incompatíveis. Não é possível atribuir um valor do tipo 'indefinido' a uma variável do tipo 'integer' ('resultado').
+
+Identificador não declarado: Ocorre quando um identificador é utilizado sem ter sido previamente declarado em nenhum escopo visível.
+Exemplo de Mensagem: Erro Semântico (Linha X): Identificador 'nome' não foi declarado.
+Demonstração (exemplo_erro1.txt): (Vide acima, erro para resultado)
+Tipos incompatíveis em atribuição: Acontece quando o tipo da expressão à direita de uma atribuição não é compatível com o tipo da variável à esquerda.
+Exemplo de Mensagem: Erro Semântico (Linha X): Tipos incompatíveis. Não é possível atribuir um valor do tipo 'tipoB' a uma variável do tipo 'tipoA' ('nome').
+Demonstração (exemplo_erro2.txt):
+
+program teste_erros2;
+var
+  idade: integer;
+  nome: string;
+  salario: real;
+begin
+  nome := "Ciclano";
+  idade := nome; // ERRO: Não pode atribuir string para integer
+  
+  salario := 1200.75;
+  idade := salario; // ERRO: Não pode atribuir real para integer
+  
+  idade := idade + nome; // ERRO: Operação aritmética com string
+end.
+
+Saída do Compilador:
+
+--- Erros Semânticos Detectados ---
+Erro Semântico (Linha 9): Tipos incompatíveis. Não é possível atribuir um valor do tipo 'string' a uma variável do tipo 'integer' ('idade').
+Erro Semântico (Linha 12): Tipos incompatíveis. Não é possível atribuir um valor do tipo 'real' a uma variável do tipo 'integer' ('idade').
+Erro Semântico (Linha 0): Operação aritmética inválida entre os tipos 'integer' e 'string'.
+
+Atribuição a uma constante: Impede que o valor de uma constante seja alterado após sua declaração inicial.
+Exemplo de Mensagem: Erro Semântico (Linha X): Não é possível atribuir valor a uma constante 'nome'.
+Demonstração: (Seria necessário um exemplo com const X = 10; X := 20;)
+Operação aritmética inválida: Detecta tentativas de realizar operações aritméticas com tipos de dados incompatíveis (ex: somar um número com uma string).
+Exemplo de Mensagem: Erro Semântico (Linha X): Operação aritmética inválida entre os tipos 'tipoA' e 'tipoB'.
+Demonstração (exemplo_erro2.txt): (Vide acima, erro para idade := idade + nome;)
+
+-------------------------------------------------------------------------------------------------------------
+
+5. Mudanças Significativas na Implementação em Relação à Terceira Etapa:
+
+A transição da Terceira Etapa (Analisador Sintático) para a Quinta Etapa (Analisador Semântico) representou 
+uma adição significativa de funcionalidade e complexidade ao compilador. As principais mudanças e suas justificativas são:
+
+Introdução do Módulo Semântico:
+
+Mudança: Criação das classes AnalisadorSemantico, TabelaDeSimbolos e Simbolo.
+Justificativa: A análise sintática apenas verifica a estrutura gramatical. 
+A análise semântica, por outro lado, exige a compreensão do "significado" do código, o que é impossível sem 
+uma estrutura para armazenar e gerenciar informações sobre os identificadores e seus atributos (tipo, categoria, escopo).
+
+Gerenciamento de Escopo:
+
+Mudança: Implementação de uma pilha de símbolos (Stack<Simbolo>) na TabelaDeSimbolos e a introdução do 
+conceito de Nivel de escopo. As ações ACAO_INICIAR_ESCOPO e ACAO_FINALIZAR_ESCOPO foram adicionadas para controlar a entrada e saída de escopos.
+Justificativa: Linguagens de programação modernas suportam escopos aninhados (ex: variáveis locais a procedures ou blocos if/while). A Tabela de Símbolos precisa refletir essa hierarquia para garantir que a visibilidade dos identificadores seja corretamente aplicada e que não haja conflitos de nomes entre diferentes escopos.
+
+Integração de Ações Semânticas na Gramática:
+
+Mudança: Inserção de marcadores #ACAO_... nas produções da gramática e modificação do 
+laço principal do analisador sintático para reconhecer e executar essas ações.
+Justificativa: A análise semântica é contextual. As verificações e a construção da Tabela de Símbolos precisam ocorrer em momentos específicos durante o processo de reconhecimento sintático. As ações semânticas permitem que a lógica semântica seja "disparada" no ponto exato em que a informação necessária está disponível.
+
+Tratamento Detalhado de Tipos:
+
+Mudança: Implementação de uma pilha de tipos (_tiposExpressao) no AnalisadorSemantico 
+e ações como ACAO_EMPILHAR_TIPO, ACAO_CHECAR_OP_ARIT e ACAO_VERIFICAR_ATRIB.
+Justificativa: A verificação de tipos é fundamental para a segurança e correção do programa. Garante que operações sejam realizadas apenas entre dados compatíveis, prevenindo erros em tempo de execução e tornando o código mais previsível.
+
+Tratamento de Constantes e Procedures:
+
+Mudança: Adição de CategoriaSimbolo.CONSTANTE e CategoriaSimbolo.PROCEDIMENTO e ações específicas (ACAO_INSERIR_CONST, ACAO_INSERIR_PROC, ACAO_INSERIR_PARAM_LISTA) para lidar com esses tipos de identificadores.
+Justificativa: Constantes e procedures têm regras semânticas distintas (ex: constantes não podem ser reatribuídas; procedures têm parâmetros e um corpo de código). O analisador semântico precisa reconhecer e aplicar essas regras.
