@@ -62,9 +62,3 @@ Este projeto implementa as fases iniciais de um compilador para uma linguagem de
 *   **`gramatica_ll1.txt`**: Contém a gramática formal utilizada, adaptada para ser LL(1).
 *   **`first_follow.txt`**: Apresenta uma estimativa dos conjuntos FIRST e FOLLOW calculados para a gramática.
 *   A tabela de parsing LL(1) está implementada diretamente no método `InicializarTabelaParsing()` dentro de `AnalisadorSintatico.cs`, **agora incorporando as ações semânticas**.
-
-## Limitações e Próximos Passos
-
-*   A gramática e a tabela de parsing foram derivadas do manual e podem precisar de refinamentos.
-*   A recuperação de erros sintáticos é básica.
-*   O projeto foca nas fases de análise léxica, sintática e **semântica**. As próximas fases (geração de código intermediário, otimização, geração de código final) não estão implementadas.
